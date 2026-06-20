@@ -2,6 +2,8 @@
 
 namespace HMsoft\Tools\Features\Media\Models;
 
+use HMsoft\Tools\Features\Translations\Contracts\Translatable;
+use HMsoft\Tools\Features\Translations\Traits\HasTranslations;
 use HMsoft\Tools\Features\DynamicFilters\Contracts\AutoFilterable;
 use HMsoft\Tools\Features\DynamicFilters\Traits\IsAutoFilterable;
 use Illuminate\Database\Eloquent\Casts\Attribute as EloquentAttribute;
@@ -10,10 +12,10 @@ use Illuminate\Database\Eloquent\Relations\MorphTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\Facades\Storage;
 
-class Medium extends Model implements AutoFilterable
+class Medium extends Model implements AutoFilterable, Translatable
 {
 
-    use  IsAutoFilterable;
+    use  IsAutoFilterable, HasTranslations;
 
     public const DEFAULT_INCLUDES = ['translations'];
 
@@ -40,10 +42,6 @@ class Medium extends Model implements AutoFilterable
         return $this->morphTo();
     }
 
-    public function translations(): HasMany
-    {
-        return $this->hasMany(MediumTranslation::class, 'medium_id');
-    }
 
     protected function fileUrl(): EloquentAttribute
     {

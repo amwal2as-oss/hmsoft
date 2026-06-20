@@ -11,9 +11,45 @@ use Illuminate\Support\Facades\Storage;
 trait HasMedia
 {
 
-    public static function bootHasMedia()
+    public static function bootHasMedia(): void
     {
-        static::deleted(fn($model) => $model->cleanupMediaFiles());
+        static::deleting(function ($model) {
+            $model->purgeAssociatedMedia();
+        });
+
+        if (method_exists(static::class, 'forceDeleting')) {
+            static::forceDeleting(function ($model) {
+                $model->purgeAssociatedMedia();
+            });
+        }
+    }
+
+    public function mediaList(): MorphMany
+    {
+        return $this->morphMany(Medium::class, 'owner')->orderBy('sort_number');
+    }
+
+    protected function purgeAssociatedMedia(): void
+    {
+        $fields = $this->cmsMediaFields ?? $this->mediaFields ?? [];
+
+        foreach ($fields as $field) {
+            $filePath = $this->getAttribute($field);
+
+            if (!empty($filePath)) {
+                MediaUploader::deleteFile($filePath);
+            }
+        }
+
+        if (\Illuminate\Support\Facades\Schema::hasTable('media')) {
+            $mediaItems = $this->mediaList()->get();
+
+            if ($mediaItems->isNotEmpty()) {
+                $paths = $mediaItems->pluck('file_path')->toArray();
+                MediaUploader::deleteFiles($paths);
+                $this->mediaList()->delete();
+            }
+        }
     }
 
     public function cleanupMediaFiles()
@@ -126,14 +162,5 @@ trait HasMedia
 
         // الآن نقوم بتوليد الرابط الآمن بناءً على المسار الجديد والـ Disk الخاص بالموديل
         return Storage::disk($this->getMediaDisk())->url($path);
-    }
-
-
-    public function mediaList(): MorphMany
-    {
-        if (Schema::hasTable('media')) {
-            return $this->morphMany(Medium::class, 'owner');
-        }
-        return $this->morphMany(Medium::class, 'owner')->whereRaw('1 = 0');
     }
 }

@@ -10,7 +10,7 @@ class OptionalAuthServiceProvider extends ServiceProvider
     public function boot(): void
     {
         // تسجيل الـ Middleware باسم مستعار
-        $router = $this->app['router'];
-        $router->aliasMiddleware('optional.auth', OptionalAuthMiddleware::class);
+        // $router = $this->app['router'];
+        // $router->aliasMiddleware('optional.auth', OptionalAuthMiddleware::class);
     }
 }

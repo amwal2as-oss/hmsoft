@@ -2,40 +2,59 @@
 
 namespace HMsoft\Tools\Features\SortNumber\Traits;
 
+use HMsoft\Tools\Features\SortNumber\Contracts\Sortable;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 
 trait HasSortNumber
 {
-    public static function bootHasSortNumber()
+    /**
+     * Boot the sorting trait logic. Hooks natively into Eloquent creating event.
+     */
+    public static function bootHasSortNumber(): void
     {
         static::creating(function (Model $model) {
+            /** @var Sortable|Model $model */
             $column = $model->getSortNumberColumnName();
 
-            // إذا لم يقم المطور بتمرير قيمة للترتيب (أو كانت null)، نقوم بحسابها تلقائياً
-            if (is_null($model->getAttribute($column))) {
+            // Auto calculate the incremental sort index if the passed value is null or 0
+            if (is_null($model->getAttribute($column)) || (int)$model->getAttribute($column) === 0) {
                 $model->setAttribute($column, $model->calculateNextSortNumber($column));
             }
         });
     }
 
     /**
-     * القيمة الافتراضية لاسم حقل الترتيب.
+     * Default Contextual Scope Resolver.
+     * Automatically sniffs for common architectural partitioning fields like 'scope'.
+     */
+    public function scopeSortByContext(Builder $query): Builder
+    {
+        return $query;
+    }
+
+    /**
+     * Calculate the next sequential sort order number based on the evaluated context scope.
+     */
+    protected function calculateNextSortNumber(string $column): int
+    {
+        $query = static::query();
+
+        // Dynamically invoke the enforced contract scoping method
+        $query = $this->scopeSortByContext($query);
+
+        return ((int) $query->max($column)) + 1;
+    }
+
+    /**
+     * Fallback lookup accessor for the sorting column name.
      */
     public function getSortNumberColumnName(): string
     {
-        // يسمح للمطور بتعريف ثابت SORT_COLUMN في المودل أو تعريف الخاصية sortNumberColumn
         if (defined('static::SORT_COLUMN')) {
             return static::SORT_COLUMN;
         }
 
         return property_exists($this, 'sortNumberColumn') ? $this->sortNumberColumn : 'sort_number';
-    }
-
-    /**
-     * دالة مساعدة لحساب رقم الترتيب التالي.
-     */
-    protected function calculateNextSortNumber(string $column): int
-    {
-        return (int) static::query()->max($column) + 1;
     }
 }

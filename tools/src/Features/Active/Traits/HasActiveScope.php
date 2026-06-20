@@ -15,12 +15,24 @@ trait HasActiveScope
     protected static function bootHasActiveScope()
     {
         static::addGlobalScope('active_scope', function (Builder $builder) {
+
             $model = $builder->getModel();
 
-            // نتحقق من الواجهة ومن شرط التفعيل لضمان عمل الـ Scope بشكل صحيح
-            if ($model instanceof Activable && $model->shouldApplyActiveScope()) {
-                $column = $model->qualifyColumn($model->getActiveColumnName());
-                $builder->where($column, true);
+            $shouldApply = true;
+
+            if (method_exists($model, 'resolveActiveScopeCondition')) {
+                $shouldApply = $model->resolveActiveScopeCondition();
+            }
+
+            if (
+                $model instanceof Activable &&
+                $model->shouldApplyActiveScope() &&
+                $shouldApply
+            ) {
+                $builder->where(
+                    $model->qualifyColumn($model->getActiveColumnName()),
+                    true
+                );
             }
         });
     }

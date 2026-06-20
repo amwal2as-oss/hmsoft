@@ -14,11 +14,13 @@ class OptionalAuthMiddleware
      */
     public function handle(Request $request, Closure $next, ...$guards): Response
     {
+
         if (empty($guards)) {
             $guards = array_keys(config('auth.guards'));
         }
 
         foreach ($guards as $guard) {
+
             if (Auth::guard($guard)->check()) {
                 Auth::shouldUse($guard);
                 $request->setUserResolver(function () use ($guard) {

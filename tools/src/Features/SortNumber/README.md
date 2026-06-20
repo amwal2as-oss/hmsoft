@@ -73,5 +73,49 @@ class Category extends Model implements Sortable
 }
 ```
 
+Overriding Context Scoping (scopeSortByContext)
+When working with complex relational layers (such as Polymorphic Models like a unified Faq component), sorting should be calculated within explicit contexts (e.g., specific to an owner_id and owner_type).
+
+You can override the scopeSortByContext method to surgically declare your own custom index boundaries:
+
+```php
+<?php
+
+namespace App\Features\Faq\Models;
+
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Builder;
+use HMsoft\Tools\Features\SortNumber\Contracts\Sortable;
+use HMsoft\Tools\Features\SortNumber\Traits\HasSortNumber;
+
+class Faq extends Model implements Sortable
+{
+    use HasSortNumber;
+
+    protected $fillable = ['owner_id', 'owner_type', 'sort_number'];
+
+    /**
+     * 🛠️ SURGICAL OVERRIDE:
+     * Restrict incremental sequential calculations inside the polymorphic boundary.
+     */
+    public function scopeSortByContext(Builder $query): Builder
+    {
+        $ownerType = $this->getAttribute('owner_type');
+        $ownerId = $this->getAttribute('owner_id');
+
+        if ($ownerType && $ownerId) {
+            // Context Shape 1: Record specific isolation (e.g., Blog #15)
+            return $query->where('owner_type', $ownerType)->where('owner_id', $ownerId);
+        } elseif ($ownerType && !$ownerId) {
+            // Context Shape 2: Model wide isolation (e.g., All general Blogs)
+            return $query->where('owner_type', $ownerType)->whereNull('owner_id');
+        }
+
+        // Context Shape 3: Global system FAQs fallback
+        return $query->whereNull('owner_type')->whereNull('owner_id');
+    }
+}
+```
+
 💡 How It Works
 The trait hooks into the Eloquent creating event. Before the model is saved to the database, it checks if a value has been provided for the sort column. If the value is null, it executes a query to find the maximum existing value in that column and increments it by 1.

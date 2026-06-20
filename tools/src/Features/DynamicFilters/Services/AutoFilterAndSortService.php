@@ -162,6 +162,8 @@ class AutoFilterAndSortService
             self::handelSorting($query, $sortingKeys, $this->joinManager);
         }
 
+        info($query->toRawSql());
+
         return $query;
     }
 
