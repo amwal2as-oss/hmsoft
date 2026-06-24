@@ -108,7 +108,6 @@ trait HasMedia
                 return null;
             }
 
-
             return [
                 'url'    => $placeholderUrl,
                 'thumb'  => $placeholderUrl,

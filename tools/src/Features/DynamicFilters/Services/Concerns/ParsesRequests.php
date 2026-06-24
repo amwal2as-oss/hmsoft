@@ -7,7 +7,7 @@ use HMsoft\Tools\Features\DynamicFilters\Data\ColumnFilterData;
 use HMsoft\Tools\Features\DynamicFilters\Data\ColumnSortData;
 use HMsoft\Tools\Features\DynamicFilters\Enums\FilterFnsEnum;
 use HMsoft\Tools\Features\DynamicFilters\Enums\PaginationFormateEnum;
-use HMsoft\Tools\Interfaces\AutoFilterable;
+use HMsoft\Tools\Features\DynamicFilters\Contracts\AutoFilterable;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
 
@@ -96,7 +96,7 @@ trait ParsesRequests
 
         return new DynamicFilterData(
             page: $finalPage,
-            perPage: $finalPerPage ,
+            perPage: $finalPerPage,
             paginationFormate: $finalPaginationFormate,
             filters: $finalFilters,
             advanceFilter: $finalAdvanceFilter,

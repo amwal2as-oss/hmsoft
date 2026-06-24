@@ -3,7 +3,7 @@
 namespace HMsoft\Tools\Features\DynamicFilters\Services\Concerns;
 
 use HMsoft\Tools\Features\DynamicFilters\Services\JoinManager;
-use HMsoft\Tools\Interfaces\AutoFilterable;
+use HMsoft\Tools\Features\DynamicFilters\Contracts\AutoFilterable;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Str;

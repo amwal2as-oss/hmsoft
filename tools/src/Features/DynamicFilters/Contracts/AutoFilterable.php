@@ -219,4 +219,48 @@ interface AutoFilterable
      * ```
      */
     public function defineVirtualFieldsDependencies(): array;
+
+
+    /**
+     * [EN] Defines the default sorting applied to the model queries in the CMS/Dashboard 
+     * if no sorting is explicitly requested by the frontend.
+     * * [AR] يحدد الترتيب الافتراضي المطبق على استعلامات الموديل في لوحة التحكم (CMS)
+     * في حال لم يتم إرسال طلب ترتيب صريح من الواجهة الأمامية.
+     *
+     * @return array|iterable An array of objects defining the sort column and direction.
+     *
+     * ### Example / مثال:
+     * ```php
+     * public function cmsDefaultSorts(): array
+     * {
+     * return [
+     * (object) ['id' => 'created_at', 'desc' => true]
+     * ];
+     * }
+     * ```
+     */
+    public function cmsDefaultSorts(): array;
+
+    /**
+     * [EN] Defines the default filters applied to the model queries in the CMS/Dashboard 
+     * if no filters are explicitly requested by the frontend.
+     * * [AR] يحدد الفلاتر الافتراضية المطبقة على استعلامات الموديل في لوحة التحكم (CMS)
+     * في حال لم يتم إرسال أي فلاتر صريحة من الواجهة الأمامية.
+     *
+     * @return array|iterable An array of objects defining the filter column, value, and condition.
+     *
+     * ### Example / مثال:
+     * ```php
+     * public function cmsDefaultFilters(): array
+     * {
+     * return [
+     * 'is_active' => (object) [
+     * 'value' => 1,
+     * 'filterFn' => \HMsoft\Tools\Features\DynamicFilters\Enums\FilterFnsEnum::equals->value
+     * ]
+     * ];
+     * }
+     * ```
+     */
+    public function cmsDefaultFilters(): array;
 }

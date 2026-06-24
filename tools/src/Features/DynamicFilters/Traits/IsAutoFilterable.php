@@ -412,4 +412,32 @@ trait IsAutoFilterable
         // AR: مثال: إذا طُلب الاسم الكامل، يجب جلب الاسم الأول والأخير من قاعدة البيانات
         return [];
     }
+
+    /**
+     * [EN] The default global sorting applied to all models using this trait.
+     * It sorts by 'id' in descending order (newest first) by default.
+     * Can be overridden inside any model.
+     * * [AR] الترتيب الافتراضي العام لجميع الموديلات التي تستخدم هذا التريت.
+     * يقوم بالترتيب حسب الـ 'id' تنازلياً (الأحدث أولاً) بشكل افتراضي.
+     * يمكن إعادة كتابة هذه الدالة (Override) داخل أي موديل لتخصيص الترتيب.
+     * * @return array
+     */
+    public function cmsDefaultSorts(): array
+    {
+        return [];
+    }
+
+    /**
+     * [EN] The default global filters applied to all models using this trait.
+     * Returns an empty array by default (no active filters).
+     * Can be overridden inside any model.
+     * * [AR] الفلاتر الافتراضية العامة لجميع الموديلات التي تستخدم هذا التريت.
+     * ترجع مصفوفة فارغة افتراضياً (بدون فلاتر نشطة).
+     * يمكن إعادة كتابة هذه الدالة (Override) داخل أي موديل لتخصيص الفلاتر الافتراضية.
+     * * @return array
+     */
+    public function cmsDefaultFilters(): array
+    {
+        return [];
+    }
 }

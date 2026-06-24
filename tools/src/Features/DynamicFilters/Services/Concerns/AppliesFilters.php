@@ -5,25 +5,38 @@ namespace HMsoft\Tools\Features\DynamicFilters\Services\Concerns;
 use HMsoft\Tools\Features\DynamicFilters\Services\JoinManager;
 use HMsoft\Tools\Features\DynamicFilters\Data\ColumnFilterData;
 use HMsoft\Tools\Features\DynamicFilters\Enums\FilterFnsEnum;
-use HMsoft\Tools\Interfaces\AutoFilterable;
+use HMsoft\Tools\Features\DynamicFilters\Contracts\AutoFilterable;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 
 trait AppliesFilters
 {
-    private static function applyAdvancedFilterGroup(Builder $query, object $filterGroup, array $allowedFilters): void
+    private static function applyAdvancedFilterGroup(Builder $query, object $filterGroup, array $allowedFilters, ?JoinManager $joinManager = null): void
     {
         $condition = strtoupper($filterGroup->condition ?? 'AND') === 'OR' ? 'orWhere' : 'where';
+
+        $model = $query->getModel();
+        $fieldMap = $model instanceof AutoFilterable
+            ? $model->defineFieldSelectionMap()
+            : [];
+
         foreach ($filterGroup->rules ?? [] as $rule) {
             if (isset($rule->condition)) {
-                $query->{$condition}(function (Builder $subQuery) use ($rule, $allowedFilters) {
-                    self::applyAdvancedFilterGroup($subQuery, $rule, $allowedFilters);
+                $query->{$condition}(function (Builder $subQuery) use ($rule, $allowedFilters, $joinManager) {
+                    self::applyAdvancedFilterGroup($subQuery, $rule, $allowedFilters, $joinManager);
                 });
             } elseif (isset($rule->id)) {
-                if (!in_array($rule->id, $allowedFilters)) continue;
+                $mappedId = $fieldMap[$rule->id] ?? $rule->id;
+
+                if (!in_array($rule->id, $allowedFilters) && !in_array($mappedId, $allowedFilters)) {
+                    continue;
+                }
+
                 $filterData = new ColumnFilterData(id: $rule->id, value: $rule->value, filterFns: FilterFnsEnum::from($rule->filterFns));
-                $query->{$condition}(function ($q) use ($rule, $filterData) {
-                    self::handelFilterOne($q, [$filterData], $rule->id);
+
+                $query->{$condition}(function ($q) use ($rule, $filterData, $model, $joinManager) {
+                    // 🚀 نمرر الـ joinManager إلى الدالة النهائية
+                    self::handelFilterOne($q, [$filterData], $rule->id, $model, $joinManager);
                 });
             }
         }

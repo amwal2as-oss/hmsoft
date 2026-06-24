@@ -123,7 +123,8 @@ class AutoFilterAndSortService
         // 3. تطبيق Advanced Filters (إن وجدت)
         if (!empty($dynamicFilterData->advanceFilter)) {
             $query->where(function (Builder $builder) use ($dynamicFilterData, $allowedFilters) {
-                self::applyAdvancedFilterGroup($builder, $dynamicFilterData->advanceFilter, $allowedFilters);
+                // 🚀 مررنا الـ joinManager هنا أيضاً
+                self::applyAdvancedFilterGroup($builder, $dynamicFilterData->advanceFilter, $allowedFilters, $this->joinManager);
             });
         }
 
@@ -137,7 +138,15 @@ class AutoFilterAndSortService
                 }
 
                 if (isset($pFilterKeys[$filter->id])) {
-                    self::handelFilterOne($query, collect($pFilterKeys[$filter->id])->toArray(), $filter->id);
+
+                    // 🚀 السحر هنا: قمنا بتمرير الموديل والـ joinManager
+                    self::handelFilterOne(
+                        $query,
+                        collect($pFilterKeys[$filter->id])->toArray(),
+                        $filter->id,
+                        $this->model,          // <-- تمت الإضافة
+                        $this->joinManager     // <-- تمت الإضافة (مهم جداً)
+                    );
                 }
             }
         }
