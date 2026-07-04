@@ -32,9 +32,11 @@ class CreateAction
             $fileDetails = [];
             $autoMediaType = 'gallery';
 
-            $folder = $data->folder instanceof Optional
+            // Checks for Optional, null, or empty strings ""
+            $folder = ($data->folder instanceof Optional || empty($data->folder))
                 ? "{$owner->getMorphClass()}/{$owner->id}/media"
                 : $data->folder;
+
 
             // فك تغليف الملف نفسه للحماية
             $fileOrUrl = $data->file instanceof Optional ? null : $data->file;
