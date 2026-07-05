@@ -48,7 +48,7 @@ class UpdateMediaData extends Data
                                 ->where('locale', $currentLocale);
 
                             if ($mediaId) {
-                                // $query->where('media_id', '!=', $mediaId);
+
                                 $query->where('medium_id', '!=', $mediaId);
                             }
 

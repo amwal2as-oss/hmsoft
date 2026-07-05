@@ -43,6 +43,7 @@ trait HasTranslations
             ->where('locale', app()->getLocale());
     }
 
+
     /**
      * مزامنة الترجمات الخاصة بالموديل (إضافة، تعديل، وحذف تلقائي للعناصر المزاحة).
      *
@@ -52,31 +53,13 @@ trait HasTranslations
      */
     public function syncTranslations(Model $model, ?array $localesData = null): void
     {
-        if ($localesData === null) {
-            return;
-        }
+        if (!$localesData) return;
 
-        if (!method_exists($model, 'translations')) {
-            return;
-        }
-
-        // 1. استخراج الرموز البرمجية للغات المرسلة لتنظيف اللغات القديمة غير المتضمنة
-        $locales = collect($localesData)->pluck('locale')->toArray();
-        $model->translations()
-            ->whereNotIn('locale', $locales)
-            ->delete();
-
-        // 2. تحديث السجلات الحالية أو إنشائها فوراً تبعاً للـ locale
-        foreach ($localesData as $localeData) {
-            if (!isset($localeData['locale'])) {
-                continue;
-            }
-
-            $model->translations()->updateOrCreate(
-                ['locale' => $localeData['locale']],
-                Arr::except($localeData, 'locale')
-            );
-        }
+        $model->syncRelation(
+            relationName: 'translations',
+            incomingData: $localesData,
+            matchKey: 'locale'
+        );
     }
 
     /**
