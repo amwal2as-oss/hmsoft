@@ -52,14 +52,21 @@ trait HandlesSingleMedia
             $path = is_string($file) ? $file : MediaUploader::upload($file, $folder, $disk, $sizeSet);
             $model->update([$field => $path]);
         } else {
-            $mediaService = app(MediaService::class);
-            $data = StoreMediaData::from([
-                'media' => [['file' => $file, 'is_default' => true, 'media_type' => $field]],
-                'folder' => $folder
+            $mediaService = app(\HMsoft\Tools\Features\Media\Service\MediaService::class);
+            $ownerId = (string) $model->getKey();
+            $ownerType = $model->getMorphClass();
+
+            $data = \HMsoft\Tools\Features\Media\Data\StoreMediaData::from([
+                'file'       => $file,
+                'is_default' => true,
+                'media_type' => $field,
+                'folder'     => $folder,
+                'owner_id'   => $ownerId,
+                'owner_type' => $ownerType,
             ]);
+
             $mediaService->store($model, $data);
         }
-
         return 'uploaded';
     }
 

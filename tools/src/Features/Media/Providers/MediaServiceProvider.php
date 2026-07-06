@@ -2,7 +2,9 @@
 
 namespace HMsoft\Tools\Features\Media\Providers;
 
+use HMsoft\Tools\Features\Media\Models\Medium;
 use HMsoft\Tools\Features\Media\Service\MediaUploadService;
+use Illuminate\Database\Eloquent\Relations\Relation;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\ServiceProvider;
 
@@ -21,6 +23,10 @@ class MediaServiceProvider extends ServiceProvider
         $this->app->singleton('media-uploader', function ($app) {
             return new MediaUploadService();
         });
+
+        Relation::enforceMorphMap([
+            'media'             => Medium::class,
+        ]);
     }
 
 

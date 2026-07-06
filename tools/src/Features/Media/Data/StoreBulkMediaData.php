@@ -14,8 +14,8 @@ class StoreBulkMediaData extends Data
     public function __construct(
         #[DataCollectionOf(StoreMediaData::class)]
         public readonly array $media,
-        public readonly ?string $owner_id = null,
-        public readonly ?string $owner_type = null,
+        public readonly Optional|string|null $owner_id = null,
+        public readonly Optional|string|null $owner_type = null,
         public readonly Optional|string|null $folder = null,
     ) {}
 
@@ -26,8 +26,14 @@ class StoreBulkMediaData extends Data
         }
 
         $ownerData = self::getOwnerFromRoute();
-        $properties['owner_id']   = $properties['owner_id'] ?? $ownerData['owner_id'];
-        $properties['owner_type'] = $properties['owner_type'] ?? $ownerData['owner_type'];
+
+        if (!isset($properties['owner_id']) && !empty($ownerData['owner_id'])) {
+            $properties['owner_id'] = $ownerData['owner_id'];
+        }
+
+        if (!isset($properties['owner_type']) && !empty($ownerData['owner_type'])) {
+            $properties['owner_type'] = $ownerData['owner_type'];
+        }
 
         $folderValue = null;
         if (isset($properties['folder'])) {
@@ -40,9 +46,13 @@ class StoreBulkMediaData extends Data
                     continue;
                 }
 
-                $item['owner_id']   = $properties['owner_id'];
-                $item['owner_type'] = $properties['owner_type'];
-                $item['folder']     = $folderValue;
+                if (isset($properties['owner_id'])) {
+                    $item['owner_id'] = $properties['owner_id'];
+                }
+                if (isset($properties['owner_type'])) {
+                    $item['owner_type'] = $properties['owner_type'];
+                }
+                $item['folder'] = $folderValue;
 
                 if (array_key_exists('is_default', $item)) {
                     $item['is_default'] = filter_var($item['is_default'], FILTER_VALIDATE_BOOLEAN);

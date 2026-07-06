@@ -17,16 +17,22 @@ class StoreMediaData extends Data
         public readonly Optional|bool $is_default,
         public readonly Optional|string $media_type,
         public readonly Optional|array $locales,
-        public readonly Optional|string $owner_id,
-        public readonly Optional|string $owner_type,
-        public readonly Optional|string|null $folder,
+        public readonly Optional|string|null $owner_id = null,
+        public readonly Optional|string|null $owner_type = null,
+        public readonly Optional|string|null $folder = null,
     ) {}
 
     public static function prepareForPipeline(array $properties): array
     {
         $ownerData = self::getOwnerFromRoute();
-        $properties['owner_id']   = $properties['owner_id'] ?? $ownerData['owner_id'];
-        $properties['owner_type'] = $properties['owner_type'] ?? $ownerData['owner_type'];
+
+        if (!isset($properties['owner_id']) && !empty($ownerData['owner_id'])) {
+            $properties['owner_id'] = $ownerData['owner_id'];
+        }
+
+        if (!isset($properties['owner_type']) && !empty($ownerData['owner_type'])) {
+            $properties['owner_type'] = $ownerData['owner_type'];
+        }
 
         if (array_key_exists('is_default', $properties)) {
             $properties['is_default'] = filter_var($properties['is_default'], FILTER_VALIDATE_BOOLEAN);
@@ -38,8 +44,8 @@ class StoreMediaData extends Data
     public static function rules(): array
     {
         return [
-            'owner_id'    => ['required', 'string'],
-            'owner_type'  => ['required', 'string'],
+            'owner_id'    => ['nullable', 'string'],
+            'owner_type'  => ['nullable', 'string'],
             'file'        => ['required', new FileOrUrl()],
             'is_default'  => ['nullable', 'boolean'],
             'media_type'  => ['nullable', 'string'],

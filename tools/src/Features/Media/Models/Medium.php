@@ -2,6 +2,8 @@
 
 namespace HMsoft\Tools\Features\Media\Models;
 
+use HMsoft\Tools\Features\Audit\Traits\HasDynamicSyncAndAudit;
+use HMsoft\Tools\Features\Audit\Traits\Auditable;
 use HMsoft\Tools\Features\Translations\Contracts\Translatable;
 use HMsoft\Tools\Features\Translations\Traits\HasTranslations;
 use HMsoft\Tools\Features\DynamicFilters\Contracts\AutoFilterable;
@@ -15,7 +17,7 @@ use Illuminate\Support\Facades\Storage;
 class Medium extends Model implements AutoFilterable, Translatable
 {
 
-    use  IsAutoFilterable, HasTranslations;
+    use  IsAutoFilterable, HasTranslations, HasDynamicSyncAndAudit,Auditable;
 
     public const DEFAULT_INCLUDES = ['translations'];
 
