@@ -54,10 +54,49 @@ class ColumnFilterData extends Data
         }
 
         switch ($columnFilterData->filterFns) {
+
             case FilterFnsEnum::dayEquals:
-                $value = \Carbon\Carbon::parse($value)->format('Y-m-d');
-                $queryBuilder->{$whereMethod . 'Date'}($columnName, '=', $value);
+                $date = \Carbon\Carbon::parse($value);
+
+                $queryBuilder->{$whereMethod . 'Date'}(
+                    $columnName,
+                    '=',
+                    $date->toDateString()
+                );
                 break;
+
+            case FilterFnsEnum::monthNumEquals:
+                $month = is_numeric($value)
+                    ? (int) $value
+                    : \Carbon\Carbon::parse($value)->month;
+
+                $queryBuilder->{$whereMethod . 'Month'}(
+                    $columnName,
+                    '=',
+                    $month
+                );
+                break;
+
+            case FilterFnsEnum::monthEquals:
+                $date = \Carbon\Carbon::parse($value);
+
+                $queryBuilder
+                    ->{$whereMethod . 'Year'}($columnName, '=', $date->year)
+                    ->{$whereMethod . 'Month'}($columnName, '=', $date->month);
+                break;
+
+            case FilterFnsEnum::yearEquals:
+                $year = is_numeric($value)
+                    ? (int) $value
+                    : \Carbon\Carbon::parse($value)->year;
+
+                $queryBuilder->{$whereMethod . 'Year'}(
+                    $columnName,
+                    '=',
+                    $year
+                );
+                break;
+
             case FilterFnsEnum::equals:
                 $queryBuilder->{$whereMethod}($columnName, '=', $value);
                 break;

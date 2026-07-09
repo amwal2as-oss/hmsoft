@@ -35,6 +35,9 @@ enum FilterFnsEnum: string
     case inNumberRange = 'inNumberRange';
 
     case dayEquals = 'dayEquals';
+    case monthEquals = 'monthEquals';
+    case monthNumEquals = 'monthNumEquals';
+    case yearEquals = 'yearEquals';
 
     case in = 'in';
     case notIn = 'notIn';
