@@ -78,11 +78,15 @@ class ColumnFilterData extends Data
                 break;
 
             case FilterFnsEnum::monthEquals:
-                $date = \Carbon\Carbon::parse($value);
+                try {
+                    $date = \Carbon\Carbon::parse($value);
 
-                $queryBuilder
-                    ->{$whereMethod . 'Year'}($columnName, '=', $date->year)
-                    ->{$whereMethod . 'Month'}($columnName, '=', $date->month);
+                    $queryBuilder->{$whereMethod}(function ($subQuery) use ($columnName, $date) {
+                        $subQuery->whereYear($columnName, '=', $date->year)
+                            ->whereMonth($columnName, '=', $date->month);
+                    });
+                } catch (\Exception $e) {
+                }
                 break;
 
             case FilterFnsEnum::yearEquals:
