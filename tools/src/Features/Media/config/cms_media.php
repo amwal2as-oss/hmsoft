@@ -40,6 +40,16 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Max Image Dimension
+    |--------------------------------------------------------------------------
+    | Images larger than this (width or height) are scaled down before WebP
+    | conversion to prevent memory exhaustion on bulk uploads.
+    | Set to 0 to disable the limit.
+    */
+    'max_image_dimension' => env('MEDIA_MAX_IMAGE_DIMENSION', 4096),
+
+    /*
+    |--------------------------------------------------------------------------
     | Image Size Sets (Thumbnails)
     |--------------------------------------------------------------------------
     | Defined sets for automatic resizing.

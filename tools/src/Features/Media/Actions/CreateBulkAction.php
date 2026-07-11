@@ -17,9 +17,10 @@ class CreateBulkAction
             $mediaCollection = collect();
 
             foreach ($data->media as $mediaItemData) {
-                // استدعاء الأكشن الفردي لكل ملف ضمن نفس الترانزكشن
                 $newMedia = $this->createAction->execute($mediaItemData, $owner);
                 $mediaCollection->push($newMedia);
+                unset($newMedia);
+                gc_collect_cycles();
             }
 
             return $mediaCollection;

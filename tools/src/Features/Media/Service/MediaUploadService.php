@@ -11,46 +11,28 @@ use Intervention\Image\Drivers\Gd\Driver;
 
 class MediaUploadService
 {
+    private const IMAGE_EXTENSIONS = ['jpg', 'jpeg', 'bmp', 'png', 'webp'];
+
     public function upload(UploadedFile $file, string $directory, ?string $disk = null, ?string $sizeSet = null): string
     {
         $disk = $disk ?? config('filesystems.default', 'public');
         $directory = trim($directory, '/');
         $fileExtension = strtolower($file->getClientOriginalExtension() ?: $file->extension());
 
-        if (!Storage::disk($disk)->exists($directory)) {
-            Storage::disk($disk)->makeDirectory($directory);
-        }
+        $this->ensureDirectoryExists($directory, $disk);
 
-        $fileName = Carbon::now()->toDateString() . "-" . uniqid();
+        $fileName = Carbon::now()->toDateString() . '-' . uniqid();
 
-        if (!in_array($fileExtension, ['jpg', 'jpeg', 'bmp', 'png', 'webp']) || $fileExtension === 'svg') {
-            $fullName = $fileName . '.' . $fileExtension;
-            Storage::disk($disk)->put("{$directory}/{$fullName}", file_get_contents($file));
-            return "{$directory}/{$fullName}";
+        if (!$this->isProcessableImage($fileExtension)) {
+            return $this->storeRawFile($file, $directory, $disk, $fileName);
         }
 
         try {
-            $manager = new ImageManager(new Driver());
-            $image = $manager->read($file);
-            $extension = 'webp';
-            $mainPath = "{$directory}/{$fileName}.{$extension}";
-
-            Storage::disk($disk)->put($mainPath, (string) $image->toWebp(quality: 80));
-
-            $sets = config('cms_media.image_sets', []);
-            if ($sizeSet && isset($sets[$sizeSet])) {
-                foreach ($sets[$sizeSet] as $suffix => $dimensions) {
-                    $resizedImage = clone $image;
-                    $resizedImage->scale(width: $dimensions['width'] ?? null, height: $dimensions['height'] ?? null);
-                    Storage::disk($disk)->put("{$directory}/{$fileName}_{$suffix}.{$extension}", (string) $resizedImage->toWebp(quality: 80));
-                }
-            }
-            return $mainPath;
+            return $this->processAndStoreImage($file, $directory, $disk, $fileName, $fileExtension, $sizeSet);
         } catch (\Throwable $th) {
             info('MediaService Upload Error', ['error' => $th->getMessage()]);
-            $fullName = $fileName . '.' . $fileExtension;
-            Storage::disk($disk)->put("{$directory}/{$fullName}", file_get_contents($file));
-            return "{$directory}/{$fullName}";
+
+            return $this->storeRawFile($file, $directory, $disk, $fileName);
         }
     }
 
@@ -97,5 +79,72 @@ class MediaUploadService
         if (isset($config['fields'][$field])) return asset($config['fields'][$field]);
         if (isset($config['models'][$modelKey])) return asset($config['models'][$modelKey]);
         return asset($config['default'] ?? 'assets/images/placeholder.png');
+    }
+
+    private function isProcessableImage(string $extension): bool
+    {
+        return in_array($extension, self::IMAGE_EXTENSIONS, true) && $extension !== 'svg';
+    }
+
+    private function ensureDirectoryExists(string $directory, string $disk): void
+    {
+        if (!Storage::disk($disk)->exists($directory)) {
+            Storage::disk($disk)->makeDirectory($directory);
+        }
+    }
+
+    /**
+     * Stream non-image files directly to storage without loading into memory.
+     */
+    private function storeRawFile(UploadedFile $file, string $directory, string $disk, string $fileName): string
+    {
+        $extension = strtolower($file->getClientOriginalExtension() ?: $file->extension());
+        $fullName = $extension ? "{$fileName}.{$extension}" : $fileName;
+
+        $path = Storage::disk($disk)->putFileAs($directory, $file, $fullName);
+
+        return $path ?: "{$directory}/{$fullName}";
+    }
+
+    /**
+     * Decode, optionally resize, convert to WebP, and generate thumbnail variants.
+     */
+    private function processAndStoreImage(
+        UploadedFile $file,
+        string $directory,
+        string $disk,
+        string $fileName,
+        string $fileExtension,
+        ?string $sizeSet
+    ): string {
+        $manager = new ImageManager(new Driver());
+        $image = $manager->read($file);
+
+        $maxDimension = (int) config('cms_media.max_image_dimension', 4096);
+        if ($maxDimension > 0 && ($image->width() > $maxDimension || $image->height() > $maxDimension)) {
+            $image->scale(width: $maxDimension, height: $maxDimension);
+        }
+
+        $extension = 'webp';
+        $mainPath = "{$directory}/{$fileName}.{$extension}";
+
+        Storage::disk($disk)->put($mainPath, (string) $image->toWebp(quality: 80));
+
+        $sets = config('cms_media.image_sets', []);
+        if ($sizeSet && isset($sets[$sizeSet])) {
+            foreach ($sets[$sizeSet] as $suffix => $dimensions) {
+                $resizedImage = clone $image;
+                $resizedImage->scale(width: $dimensions['width'] ?? null, height: $dimensions['height'] ?? null);
+                Storage::disk($disk)->put(
+                    "{$directory}/{$fileName}_{$suffix}.{$extension}",
+                    (string) $resizedImage->toWebp(quality: 80)
+                );
+                unset($resizedImage);
+            }
+        }
+
+        unset($image, $manager);
+
+        return $mainPath;
     }
 }
