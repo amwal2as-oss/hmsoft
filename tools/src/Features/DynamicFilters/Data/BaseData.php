@@ -10,15 +10,36 @@ use ReflectionProperty;
 use ReflectionUnionType;
 use ReflectionNamedType;
 
+/**
+ * Base response DTO with optional JSON field pruning driven by query parameters.
+ *
+ * Works with Spatie Laravel Data and supports:
+ * - `?fields=id,title,category.name` — whitelist (include only listed fields, supports dot notation)
+ * - `?except=password,translations` — blacklist (exclude listed fields, supports dot notation)
+ *
+ * When both are present, `fields` is applied first (whitelist), then `except` removes any
+ * remaining keys from the result.
+ *
+ * @see filterableCollect() For paginated lists / collections returned from controllers
+ * @see toArray()           For single-object responses
+ */
 abstract class BaseData extends Data
 {
+    /** @var array<string, array<string, bool>> Runtime cache: class => property => isRawArray */
     protected static array $rawFieldsCache = [];
 
-    // 💡 [الحل الجوهري]: قفل لمنع الفلترة المتداخلة (Recursion) في الكائنات الفرعية
+    /**
+     * Recursion guard — prevents nested BaseData::toArray() from re-applying pruning.
+     */
     protected static bool $isPruning = false;
 
     /**
-     * 1. فلترة المصفوفات (Collections / Pagination)
+     * Transform a list (array, Collection, paginator, or DataCollection) and apply field pruning.
+     *
+     * Typical controller usage after AutoFilterAndSortService:
+     * ```php
+     * $result['data'] = DecreeData::filterableCollect($result['data']);
+     * ```
      */
     public static function filterableCollect(mixed $items): array
     {
@@ -29,18 +50,17 @@ abstract class BaseData extends Data
         }
 
         $request = request();
+        $fields = static::parseQueryList($request->query('fields'));
+        $except = static::parseQueryList($request->query('except'));
 
-        if (is_object($collection) && method_exists($collection, 'only') && $request->filled('fields')) {
-            $fields = array_map('trim', explode(',', $request->query('fields')));
+        if (is_object($collection) && method_exists($collection, 'only') && !empty($fields)) {
             $collection->only(...static::sanitizeFields($fields));
         }
 
-        if (is_object($collection) && method_exists($collection, 'except') && $request->filled('except')) {
-            $except = array_map('trim', explode(',', $request->query('except')));
+        if (is_object($collection) && method_exists($collection, 'except') && !empty($except)) {
             $collection->except(...static::sanitizeFields($except));
         }
 
-        // إذا كنا بالفعل داخل عملية فلترة، نعيد المصفوفة مباشرة لمنع تكرار العملية
         if (static::$isPruning) {
             return $collection->toArray();
         }
@@ -48,9 +68,8 @@ abstract class BaseData extends Data
         static::$isPruning = true;
         try {
             $array = $collection->toArray();
-            $prunedArray = static::applyDeepArrayPruningToCollection($array);
+            $prunedArray = static::applyResponseFieldPruning($array, $fields, $except);
         } finally {
-            // نضمن فك القفل دائماً حتى لو حدث خطأ (Exceptions)
             static::$isPruning = false;
         }
 
@@ -58,11 +77,10 @@ abstract class BaseData extends Data
     }
 
     /**
-     * 2. فلترة العناصر المفردة (Single Objects)
+     * Serialize a single DTO and apply field pruning from the current request.
      */
     public function toArray(): array
     {
-        // إذا كان الكائن الأب يقوم بالفلترة حالياً، فالكائن الابن يكتفي بالتحويل العادي
         if (static::$isPruning) {
             return parent::toArray();
         }
@@ -70,7 +88,9 @@ abstract class BaseData extends Data
         static::$isPruning = true;
         try {
             $array = parent::toArray();
-            $prunedArray = static::applyDeepArrayPruningToCollection($array);
+            $fields = static::parseQueryList(request()->query('fields'));
+            $except = static::parseQueryList(request()->query('except'));
+            $prunedArray = static::applyResponseFieldPruning($array, $fields, $except);
         } finally {
             static::$isPruning = false;
         }
@@ -79,39 +99,85 @@ abstract class BaseData extends Data
     }
 
     /**
-     * 3. الموزع الذكي
+     * Parse a comma-separated query value into a trimmed list of field paths.
+     *
+     * @return string[]
      */
-    protected static function applyDeepArrayPruningToCollection(array $array): array
+    protected static function parseQueryList(?string $value): array
     {
-        $request = request();
-        if (!$request->filled('fields')) return $array;
-
-        $fields = array_map('trim', explode(',', $request->query('fields')));
-
-        // أ. هل هي بيانات مجدولة (Paginated Data)؟
-        if (isset($array['data']) && is_array($array['data']) && (isset($array['meta']) || isset($array['links']))) {
-            $array['data'] = array_map(fn($item) => static::applyDeepArrayPruning($item, $fields), $array['data']);
-            return $array;
+        if ($value === null || $value === '') {
+            return [];
         }
 
-        // ب. هل هي مصفوفة عناصر (Normal Collection)؟
-        if (isset($array[0]) && is_array($array[0])) {
-            return array_map(fn($item) => static::applyDeepArrayPruning($item, $fields), $array);
-        }
-
-        // ج. هل هو عنصر مفرد (Single Item)
-        return static::applyDeepArrayPruning($array, $fields);
+        return array_values(array_filter(array_map('trim', explode(',', $value))));
     }
 
     /**
-     * 4. محرك الفلترة الجراحية
+     * Apply whitelist (`fields`) and/or blacklist (`except`) pruning to a response array.
+     *
+     * Handles paginated payloads (`data` + `meta`/`links`), plain lists, and single objects.
      */
-    protected static function applyDeepArrayPruning(array $itemArray, array $requestedFields): array
+    protected static function applyResponseFieldPruning(array $array, array $fields, array $except): array
+    {
+        if (empty($fields) && empty($except)) {
+            return $array;
+        }
+
+        // Paginated: { data: [...], meta: {...}, links: {...} }
+        if (isset($array['data']) && is_array($array['data']) && (isset($array['meta']) || isset($array['links']))) {
+            $array['data'] = static::pruneItemList($array['data'], $fields, $except);
+            return $array;
+        }
+
+        // Plain list: [ {...}, {...} ]
+        if (isset($array[0]) && is_array($array[0])) {
+            return static::pruneItemList($array, $fields, $except);
+        }
+
+        return static::pruneSingleItem($array, $fields, $except);
+    }
+
+    /**
+     * @param array<int, array<string, mixed>> $items
+     * @return array<int, array<string, mixed>>
+     */
+    protected static function pruneItemList(array $items, array $fields, array $except): array
+    {
+        return array_map(
+            fn(array $item) => static::pruneSingleItem($item, $fields, $except),
+            $items
+        );
+    }
+
+    /**
+     * Whitelist then blacklist a single associative array item.
+     */
+    protected static function pruneSingleItem(array $item, array $fields, array $except): array
+    {
+        if (!empty($fields)) {
+            $item = static::applyDeepArrayInclude($item, $fields);
+        }
+
+        if (!empty($except)) {
+            $item = static::applyDeepArrayExclude($item, $except);
+        }
+
+        return $item;
+    }
+
+    /**
+     * Include only the requested field paths (supports dot notation for nested keys).
+     *
+     * Examples:
+     * - `fields=title`           → { title }
+     * - `fields=category.name`   → { category: { name } }
+     * - `fields=values.title`    → { values: [{ title }, ...] } for list relations
+     */
+    protected static function applyDeepArrayInclude(array $itemArray, array $requestedFields): array
     {
         $filtered = [];
 
         foreach ($requestedFields as $field) {
-            // الحالة الأولى: حقل رئيسي بالكامل (مثال: fields=vision)
             if (!str_contains($field, '.')) {
                 if (array_key_exists($field, $itemArray)) {
                     $filtered[$field] = $itemArray[$field];
@@ -119,18 +185,20 @@ abstract class BaseData extends Data
                 continue;
             }
 
-            // الحالة الثانية: حقل فرعي عميق (مثال: fields=vision.id)
             $parts = explode('.', $field);
             $root = $parts[0];
 
-            if (!array_key_exists($root, $itemArray)) continue;
+            if (!array_key_exists($root, $itemArray)) {
+                continue;
+            }
 
             $internalPath = implode('.', array_slice($parts, 1));
             $targetArray = $itemArray[$root];
 
-            if (!is_array($targetArray)) continue;
+            if (!is_array($targetArray)) {
+                continue;
+            }
 
-            // أ. إذا كانت البيانات عبارة عن قائمة (مثل values أو goals)
             if (array_is_list($targetArray)) {
                 if (!isset($filtered[$root])) {
                     $filtered[$root] = array_fill(0, count($targetArray), []);
@@ -141,9 +209,7 @@ abstract class BaseData extends Data
                         Arr::set($filtered[$root][$index], $internalPath, Arr::get($listItem, $internalPath));
                     }
                 }
-            }
-            // ب. إذا كانت كائن مفرد (مثل vision أو mission)
-            else {
+            } else {
                 if (!isset($filtered[$root]) || !is_array($filtered[$root])) {
                     $filtered[$root] = [];
                 }
@@ -158,7 +224,51 @@ abstract class BaseData extends Data
     }
 
     /**
-     * 5. حماية Spatie (Sanitization)
+     * Remove excluded field paths from an item (supports dot notation).
+     *
+     * Examples:
+     * - `except=password`              → removes top-level key
+     * - `except=category.translations`   → removes nested key inside category
+     * - `except=values.content`        → removes content from each list item in values
+     */
+    protected static function applyDeepArrayExclude(array $itemArray, array $excludedFields): array
+    {
+        foreach ($excludedFields as $field) {
+            if (!str_contains($field, '.')) {
+                unset($itemArray[$field]);
+                continue;
+            }
+
+            $parts = explode('.', $field);
+            $root = array_shift($parts);
+            $internalPath = implode('.', $parts);
+
+            if (!array_key_exists($root, $itemArray) || !is_array($itemArray[$root])) {
+                continue;
+            }
+
+            if (array_is_list($itemArray[$root])) {
+                foreach ($itemArray[$root] as $index => $listItem) {
+                    if (is_array($listItem)) {
+                        Arr::forget($itemArray[$root][$index], $internalPath);
+                    }
+                }
+            } else {
+                Arr::forget($itemArray[$root], $internalPath);
+            }
+        }
+
+        return $itemArray;
+    }
+
+    /**
+     * Sanitize field names for Spatie DataCollection::only/except.
+     *
+     * Nested Data/DTO properties must be referenced by root key only;
+     * raw array/scalar properties keep the full dot path.
+     *
+     * @param string[] $fields
+     * @return string[]
      */
     protected static function sanitizeFields(array $fields): array
     {
@@ -178,7 +288,7 @@ abstract class BaseData extends Data
     }
 
     /**
-     * 6. الاستنتاج الذكي لأنواع البيانات
+     * Detect whether a property is a plain array/scalar (true) or nested Data object (false).
      */
     protected static function isRawArrayField(string $className, string $propertyName): bool
     {

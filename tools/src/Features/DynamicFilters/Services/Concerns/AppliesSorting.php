@@ -8,6 +8,9 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Str;
 
+/**
+ * Applies ORDER BY for base columns and joinable BelongsTo/HasOne relation paths.
+ */
 trait AppliesSorting
 {
     public static function handelSorting(Builder $query, $sortingKeys, JoinManager $joinManager): void

@@ -9,6 +9,9 @@ use HMsoft\Tools\Features\DynamicFilters\Contracts\AutoFilterable;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 
+/**
+ * Applies flat and nested (advanceFilter) column filters with relation/JSON support.
+ */
 trait AppliesFilters
 {
     private static function applyAdvancedFilterGroup(Builder $query, object $filterGroup, array $allowedFilters, ?JoinManager $joinManager = null): void
@@ -32,7 +35,12 @@ trait AppliesFilters
                     continue;
                 }
 
-                $filterData = new ColumnFilterData(id: $rule->id, value: $rule->value, filterFns: FilterFnsEnum::from($rule->filterFns));
+                $filterFnEnum = FilterFnsEnum::tryFrom($rule->filterFns ?? '');
+                if (!$filterFnEnum) {
+                    continue;
+                }
+
+                $filterData = new ColumnFilterData(id: $rule->id, value: $rule->value, filterFns: $filterFnEnum);
 
                 $query->{$condition}(function ($q) use ($rule, $filterData, $model, $joinManager) {
                     // 🚀 نمرر الـ joinManager إلى الدالة النهائية

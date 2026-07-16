@@ -5,6 +5,9 @@ namespace HMsoft\Tools\Features\DynamicFilters\Services\Concerns;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 
+/**
+ * Builds minimal SELECT lists and eager-load plans from the `fields` query parameter.
+ */
 trait BuildsSurgicalSelects
 {
     private function buildSurgicalSelectAndEagerLoad(Builder $query, ?string $fields): void

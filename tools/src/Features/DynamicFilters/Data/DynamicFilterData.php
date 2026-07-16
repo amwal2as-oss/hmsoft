@@ -6,25 +6,28 @@ use HMsoft\Tools\Features\DynamicFilters\Enums\PaginationFormateEnum;
 use Illuminate\Support\Collection;
 use Spatie\LaravelData\Data;
 
+/**
+ * Normalized input for {@see \HMsoft\Tools\Features\DynamicFilters\Services\AutoFilterAndSortService}.
+ *
+ * Populated automatically from the HTTP request by ParsesRequests::initializeDynamicFilterData().
+ */
 class DynamicFilterData extends Data
 {
     /**
-     * dynamic filter data model.
-     *
-     * @param ?string $globalFilter global filter string
-     * @param array<ColumnFilterData> $filters dynamic filtering array
-     * @param array<ColumnFilterData> $orFilters
-     * @param object|array|null $advanceFilter
-     * @param array<ColumnSortData> $sorting
-     * @param string $page
-     * @param string|null $perPage
-     * @param callable $extraOperation
-     * @param callable $globaleFilterExtraOperation
-     * @param callable $beforeOperation
-     * @param PaginationFormateEnum $paginationFormate
-     * @param ?string $columns [RENAMED] columns to select from DB (e.g. "id,name,category.slug")
-     * @param bool $count_only
-     **/
+     * @param string|null $globalFilter Free-text search applied across model search columns
+     * @param array<ColumnFilterData>|Collection $filters Column filters (AND between different columns)
+     * @param array<ColumnFilterData>|Collection $orFilters Reserved for future OR-filter groups
+     * @param object|array|null $advanceFilter Nested filter tree (React Query Builder format)
+     * @param array<ColumnSortData>|Collection $sorting Sort directives
+     * @param string|null $page Page number or `all`
+     * @param string|null $perPage Page size, `all`, or header-driven disable via `pdt: 0`
+     * @param callable|null $extraOperation Hook after filters/global search: fn(Builder $q, array $ctx)
+     * @param callable|null $beforeOperation Hook before filters: fn(Builder $q, array $ctx)
+     * @param callable|null $globaleFilterExtraOperation Hook inside global search OR group
+     * @param string|null $columns DB column selection (maps from `?fields=` query param)
+     * @param PaginationFormateEnum $paginationFormate Response shape for pagination
+     * @param bool $count_only Return `{ data: totalCount }` without rows
+     */
     public function __construct(
         public ?string $globalFilter = null,
         public array|Collection $filters = [],

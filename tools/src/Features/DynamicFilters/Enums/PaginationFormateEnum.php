@@ -2,7 +2,9 @@
 
 namespace HMsoft\Tools\Features\DynamicFilters\Enums;
 
-
+/**
+ * Controls how paginated results are returned from dynamicSearchFromRequest().
+ */
 enum PaginationFormateEnum: string
 {
 

@@ -14,6 +14,12 @@ use Illuminate\Database\Eloquent\Relations\MorphToMany;
 use Illuminate\Database\Eloquent\Relations\Relation;
 use Illuminate\Support\Str;
 
+/**
+ * Tracks LEFT JOIN aliases for relation filters, sorts, and surgical SELECTs.
+ *
+ * Supports BelongsTo, HasOne/Many, BelongsToMany, MorphOne/Many, and nested paths
+ * like `category.translations`.
+ */
 class JoinManager
 {
     private array $aliases = [];

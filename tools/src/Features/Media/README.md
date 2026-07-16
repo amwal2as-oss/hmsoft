@@ -1,349 +1,530 @@
-## Installation & Core Configuration
+# Media
 
-### Step 1: Register Service Provider
+> **HMsoft Tools** — Upload, store, sync, and serve files for Laravel CMS/API projects.
 
-Ensure the package provider is registered within your application bootstrap (`bootstrap/providers.php` or `config/app.php` depending on Laravel version):
+Supports **two storage strategies**:
+
+| Strategy | Storage | Best for |
+|----------|---------|----------|
+| **Column mode** | Path saved on model table (`blogs.image`) | Single image/PDF/icon per resource |
+| **Polymorphic mode** | Rows in `media` table via `mediaList()` | Galleries, attachments, multi-file |
+
+---
+
+## Table of contents
+
+1. [Overview](#overview)
+2. [Two storage modes](#two-storage-modes)
+3. [Setup checklist](#setup-checklist)
+4. [Backend setup — Column mode (single file)](#backend-setup--column-mode-single-file)
+5. [Backend setup — Polymorphic mode (gallery)](#backend-setup--polymorphic-mode-gallery)
+6. [Usage — Upload / sync / delete](#usage--upload--sync--delete)
+7. [Usage — URL & media objects](#usage--url--media-objects)
+8. [Usage — Standalone Media API](#usage--standalone-media-api)
+9. [Frontend integration](#frontend-integration)
+10. [Configuration](#configuration)
+11. [Database schema](#database-schema)
+12. [Troubleshooting](#troubleshooting)
+13. [Extended documentation](#extended-documentation)
+
+---
+
+## Overview
+
+```mermaid
+flowchart TB
+    subgraph App["Your feature (Blog, News, …)"]
+        M[Model + HasMedia]
+        D[Sync*Data DTO]
+        A[SyncImageAction]
+    end
+
+    subgraph MediaFeature["Media feature"]
+        HSM[HandlesSingleMedia]
+        HMM[HandlesMultipleMedia]
+        MU[MediaUploadService]
+        MS[MediaService]
+    end
+
+    subgraph Storage
+        COL[(Entity column e.g. blogs.image)]
+        POL[(media table)]
+        DISK[(Filesystem disk)]
+    end
+
+    D --> A --> HSM
+    A --> HMM --> MS
+    HSM --> MU --> DISK
+    HSM --> COL
+    HSM --> MS --> POL
+```
+
+**Typical column-mode flow:**
+
+```
+POST /api/blogs/{id}/sync-image  (multipart)
+  → SyncBlogImageData validates file
+  → SyncImageAction → syncSingleImage()
+  → MediaUploader::upload() → blogs/image.webp
+  → blogs.image column updated
+  → Response includes image_url via HasMedia magic accessor
+```
+
+---
+
+## Two storage modes
+
+| | Column mode | Polymorphic mode |
+|---|-------------|------------------|
+| **Detection** | Model table has the column (`image`, `pdf_path`) | Column does **not** exist on model table |
+| **Storage** | Path string on entity row | `media` table row linked via morph |
+| **Sync trait** | `HandlesSingleMedia` | `HandlesSingleMedia` or `HandlesMultipleMedia` |
+| **Read URL** | `$model->image_url` (HasMedia) | `$medium->file_url` or `mediaList` relation |
+| **Used in this project** | Blog, News, Decree, Sector, … | Legislation attachments, Complaint files, Media API |
+
+---
+
+## Setup checklist
+
+```
+Column mode (single image/PDF/icon)
+[ ] 1. Model uses HasMedia trait
+[ ] 2. Model: protected array $cmsMediaFields = ['image']
+[ ] 3. Model: public const MEDIA_FOLDER = 'blogs'
+[ ] 4. Entity table has column (e.g. image VARCHAR)
+[ ] 5. Create Sync{Feature}ImageData with InteractsWithMediaRules
+[ ] 6. Create SyncImageAction using HandlesSingleMedia
+[ ] 7. Wire controller route + service method
+[ ] 8. Response DTO: getMediaObject('image') or image_url accessor
+
+Polymorphic mode (gallery / attachments)
+[ ] 1. Model uses HasMedia (mediaList relation)
+[ ] 2. Run media migrations (auto-loaded by provider)
+[ ] 3. Create sync action with HandlesMultipleMedia OR use Media API
+[ ] 4. Optional: register morph map alias for owner_type
+
+Standalone Media API (optional)
+[ ] 5. Morph map for owner_type in AppServiceProvider
+[ ] 6. Routes: api/{owner_type}/{owner_id}/media
+```
+
+---
+
+## Backend setup — Column mode (single file)
+
+### Step 1 — Model
 
 ```php
-HMsoft\\Tools\\Features\\Media\\Providers\\MediaServiceProvider::class
-```
+use HMsoft\Tools\Features\Media\Traits\HasMedia;
 
-Step 2: Publish Assets & Configurations
-Execute the Artisan console command to publish the database schema migrations and the primary configuration file:
-
-```Bash
-php artisan vendor:publish --tag="cms_media-config"
-php artisan vendor:publish --tag="cms_media-migrations"
-```
-
-Step 3: Run Migrations
-Run your migrations to generate the underlying schema:
-
-```Bash
-php artisan migrate
-```
-
-Step 4: Review Configuration File (config/hmsoft-media.php)This file controls the default behaviors, underlying drivers, fallback assets, and thumbnail scaling rules across the package:
-
-```PHP
-<?php
-
-return [
-    /*
-    |--------------------------------------------------------------------------
-    | Default Torage Storage Disk
-    |--------------------------------------------------------------------------
-    | The default filesystem disk mapped from config/filesystems.php where
-    | uploaded media assets will be streamed.
-    */
-    'disk' => env('MEDIA_DISK', 'public'),
-
-    /*
-    |--------------------------------------------------------------------------
-    | Image Fallback Placeholders
-    |--------------------------------------------------------------------------
-    | Global asset path fallbacks rendered dynamically by accessors when an
-    | entity or specific image field lacks a physical path asset.
-    */
-    'placeholders' => [
-        'default' => 'assets/images/placeholder.png',
-        'models' => [
-            'user' => 'assets/images/avatar-placeholder.png',
-            'product' => 'assets/images/product-placeholder.png',
-        ],
-        'fields' => [
-            'icon' => 'assets/images/default-icon.png',
-            'cover_image' => 'assets/images/default-cover.png',
-        ]
-    ],
-
-    /*
-    |--------------------------------------------------------------------------
-    | Image Sizing Sets (Thumbnails / Scale Sets)
-    |--------------------------------------------------------------------------
-    | Defines configuration arrays for automatic image manipulation.
-    | When a specific sizing set is targeted, Intervention Image handles
-    | scaling and writes dedicated suffixed versions to the disk.
-    */
-    'image_sets' => [
-        'gallery' => [
-            'thumb'  => ['width' => 150, 'height' => 150],
-            'medium' => ['width' => 800, 'height' => null], // Aspect ratio preserved
-        ],
-        'avatar' => [
-            'small' => ['width' => 64, 'height' => 64],
-        ]
-    ]
-];
-```
-
-3. Core Architectural ComponentsA. The Validation Layer: FileOrUrl Custom RuleUnlike standard Laravel rules that force a hard split between binary fields and text links, the FileOrUrl rule accepts an Illuminate\\Http\\UploadedFile binary instance or a valid absolute external URL string (e.g., cloud assets, YouTube streams, external CDN resources).
-
-```PHP
-use HMsoft\\Tools\\Features\\Media\\Rules\\FileOrUrl;
-
-$rules = [
-    'attachment' => ['required', new FileOrUrl()],
-];
-```
-
-B. Context-Agnostic Context Loading: ExtractsOwnerFromRouteDTO pipelines use this trait within prepareForPipeline to automatically intercept parameters from the active HTTP request route ({owner_type}/{owner_id}).Crucially, it uses structural fallback operators (??). If called programmatically within a console command, an asynchronous queue job, or a test factory where an active HTTP route context is entirely absent, it falls back to explicit data arrays without raising exceptions.
-
-```PHP
-$properties['owner_id']   = $properties['owner_id'] ?? $ownerData['owner_id'];
-$properties['owner_type'] = $properties['owner_type'] ?? $ownerData['owner_type'];
-```
-
-4. Deep-Dive Integration Use CasesThe toolkit supports three primary structural patterns that cover all file and media management requirements in modern applications.Use Case 1: Direct Table Columns (Single Media Field)Use this approach when your entity table explicitly defines an image or file path column directly within its own database schema migration (e.g., avatar on a users table or image on a categories table), but you want smart accessors, automatic disk cleanup, and effortless trait-based streaming.1. Database Schema Setup
-
-```PHP
-Schema::create('categories', function (Blueprint $table) {
-    $table->id();
-    $table->string('name');
-    $table->string('image')->nullable(); // Direct column holding the file path string
-    $table->timestamps();
-});
-```
-
-2. Model SetupImplement the HasMedia trait and define the explicit target columns inside the $cmsMediaFields protected array property. This tells the internal magic accessors which properties to monitor.
-
-```PHP
-namespace App\\Models;
-
-use HMsoft\\Tools\\Features\\Media\\Traits\\HasMedia;
-use Illuminate\\Database\\Eloquent\\Model;
-
-class Category extends Model
+class Blog extends Model
 {
     use HasMedia;
 
-    protected $fillable = ['name', 'image'];
+    public const MEDIA_FOLDER = 'blogs';
 
-    /**
-     * Map direct table columns to automatically intercept and trigger magic accessors.
-     */
     protected array $cmsMediaFields = ['image'];
+    public string $cmsMediaSet = 'blog_items'; // optional — thumbnail srcset
 }
 ```
 
-3. Uploading & In-Place File Replacement within an ActionInject the HandlesSingleMedia trait within your business action layer. The syncSingleImage method automatically streams the file, deletes any previously configured physical asset, updates the target attribute, and persists modifications.
+| Property | Required | Description |
+|----------|----------|-------------|
+| `$cmsMediaFields` | ✅ | Column names treated as media (enables `image_url`, `image_object`) |
+| `MEDIA_FOLDER` | ✅ | Storage subdirectory passed to upload |
+| `$cmsMediaSet` | Optional | Key in `config('cms_media.image_sets')` for thumb/medium variants |
+| `$cmsMediaDisk` | Optional | Override filesystem disk per model |
+| `$cmsPlaceholder` | Optional | Placeholder URL when field is empty |
+| `$cmsNoPlaceholder` | Optional | Return `null` instead of placeholder |
 
-```PHP
-namespace App\\Actions;
+Legacy alias: `$mediaFields` works if `$cmsMediaFields` is not set.
 
-use App\\Models\\Category;
-use HMsoft\\Tools\\Features\\Media\\Traits\\HandlesSingleMedia;
+### Step 2 — Sync DTO with validation
 
-class UpdateCategoryAction
+```php
+use HMsoft\Tools\Features\Media\Traits\InteractsWithMediaRules;
+use Spatie\LaravelData\Data;
+
+class SyncBlogImageData extends Data
 {
-    use HandlesSingleMedia;
+    use InteractsWithMediaRules;
 
-    public function execute(Category $category, array $payload): Category
+    public function __construct(
+        public readonly ?bool $delete_image = null,
+        public readonly mixed $image = null,
+    ) {}
+
+    public static function rules(): array
     {
-        $category->update(['name' => $payload['name']]);
-
-        if (isset($payload['image'])) {
-            // Automatically uploads binary file or stores absolute string URL.
-            // Instantly purges old physical files from disk if an asset path existed.
-            $this->syncSingleImage(
-                model: $category,
-                file: $payload['image'], // Accepts UploadedFile or absolute URL string
-                field: 'image',
-                shouldDelete: true
-            );
-        }
-
-        return $category;
-    }
-}
-```
-
-4. Magic Accessor Retrieval in the Frontend LayerThe HasMedia trait overrides standard model attribute lookups. Appending \_url or \_object suffixes activates
-   programmatic resolution:
-
-```PHP
-$category = Category::find(1);
-
-// 1. Get absolute public URL string (Resolves to Storage::disk()->url() or the raw URL)
-echo $category->image_url;
-
-// 2. Get customized image sizing suffixes (e.g., thumb)
-echo $category->image_url_thumb;
-
-// 3. Get rich JSON representation for API payloads containing standard formats and responsive srcsets
-// Returns: ['url' => '...', 'thumb' => '...', 'medium' => '...', 'srcset' => '...']
-return response()->json($category->image_object);
-```
-
-Use Case 2: Polymorphic Single Media (Stored in media Table)Use this approach when you want to store single explicit assets (such as a company logo or contract pdf) without modifying the host table schema, keeping entity migrations completely decoupled from media assets.1. Model ConfigurationSimply apply the HasMedia trait, but omit the field name from the $cmsMediaFields array.
-
-```PHP
-namespace App\\Models;
-
-use HMsoft\\Tools\\Features\\Media\\Traits\\HasMedia;
-use Illuminate\\Database\\Eloquent\\Model;
-
-class Company extends Model
-{
-    use HasMedia;
-
-    protected $fillable = ['company_name'];
-}
-```
-
-2. Streaming via Trait ExecutionThe syncSingleImage method automatically checks if the host model's underlying database table contains a matching physical column name. Seeing that it lacks one, it handles storage inside the polymorphic shared media table instead, setting the structural media_type flag to your field name.
-
-```PHP
-namespace App\\Actions;
-
-use App\\Models\\Company;
-use HMsoft\\Tools\\Features\\Media\\Traits\\HandlesSingleMedia;
-
-class SaveCompanyLogoAction
-{
-    use HandlesSingleMedia;
-
-    public function execute(Company $company, mixed $fileInput): void
-    {
-        // Creates, maps, or replaces a single row inside the shared `media` table
-        // where owner_id = $company->id, owner_type = 'companies', and media_type = 'logo'
-        $this->syncSingleImage(
-            model: $company,
-            file: $fileInput,
-            field: 'logo',
-            shouldDelete: true
+        return array_merge(
+            ['image' => ['required_without:delete_image']],
+            self::getSingleMediaRules('image'), // adds FileOrUrl + delete_image
         );
     }
 }
 ```
 
-3. Data Querying via Polymorphic Access
+`getSingleMediaRules('image')` adds:
 
-```PHP
-$company = Company::with('mediaList')->find(1);
+- `image` — file upload **or** external URL (`FileOrUrl` rule)
+- `delete_image` — boolean to remove existing file
 
-// Isolate the polymorphic item
-$logo = $company->mediaList()->where('media_type', 'logo')->first();
-echo $logo->file_url;
-```
+### Step 3 — Sync action
 
-Use Case 3: Polymorphic Media Galleries (Multiple Files)Ideal for rich multi-file attachments, such as e-commerce product image galleries, estate portfolios, or slider banners where each asset requires customizable sequential ordering (sort_number), default item selection (is_default), and multilingual translatable data.1. Model Setup
+```php
+use HMsoft\Tools\Features\Media\Traits\HandlesSingleMedia;
 
-```PHP
-namespace App\\Models;
-
-use HMsoft\\Tools\\Features\\Media\\Traits\\HasMedia;
-use Illuminate\\Database\\Eloquent\\Model;
-
-class Product extends Model
+class SyncImageAction
 {
-    use HasMedia;
+    use HandlesSingleMedia;
 
-    protected $fillable = ['title', 'sku'];
+    public function execute(Blog $blog, SyncBlogImageData $data): array
+    {
+        $status = $this->syncSingleImage(
+            model: $blog,
+            file: $data->image ?? null,
+            field: 'image',
+            deleteImage: (bool) ($data->delete_image ?? false),
+            folder: Blog::MEDIA_FOLDER,
+        );
+
+        return [
+            'model'        => $blog->refresh(),
+            'media_status' => $status, // 'uploaded' | 'deleted' | 'unchanged'
+        ];
+    }
 }
 ```
 
-2. Syncing Galleries in Bulk via TraitLeverage the HandlesMultipleMedia trait to synchronize extensive media arrays, cleanly purging targeted deletion sets while processing new file arrays concurrently.
+### Step 4 — Response DTO
 
-```PHP
-namespace App\\Actions;
+```php
+// In BlogData::fromModel()
+image: $blog->getMediaObject('image'),
+image_url: $blog->image_url,
+```
 
-use App\\Models\\Product;
-use HMsoft\\Tools\\Features\\Media\\Traits\\HandlesMultipleMedia;
+---
 
-class SyncProductGalleryAction
+## Backend setup — Polymorphic mode (gallery)
+
+### When column does not exist
+
+`HandlesSingleMedia` automatically creates a `media` row via `MediaService::store()`.
+
+### Multiple files — HandlesMultipleMedia
+
+```php
+use HMsoft\Tools\Features\Media\Traits\HandlesMultipleMedia;
+
+class SyncFilesAction
 {
     use HandlesMultipleMedia;
 
-    public function execute(Product $product, array $data): void
+    public function execute(Legislation $legislation, ?array $files, array $deletedIds = []): void
     {
         $this->syncMultipleMedia(
-            model: $product,
-            files: $data['gallery_images'] ?? [],   // Array of binaries or links
-            field: 'product_gallery',               // Mapped media_type
-            deletedIds: $data['removed_photo_ids'] ?? [], // Cleans up database records and disk files
-            folder: 'products/galleries'            // Disk storage sub-directory
+            model: $legislation,
+            files: $files ?? [],
+            field: 'attachment',        // media_type slot name
+            deletedIds: $deletedIds,
+            folder: Legislation::MEDIA_FOLDER,
         );
     }
 }
 ```
 
-5. In-Place Asset Substitution & Mime-Type Inference
-   The toolkit's UpdateAction eliminates frontend complexity by resolving modifications in a single payload request. When a file modification is issued to an active asset record via POST /api/{owner_type}/{owner_id}/media/{medium_id}, the toolkit executes the following pipeline:
+Gallery validation (optional):
 
-Validation & Extraction: Intercepts incoming inputs via UpdateMediaData filtering out any unpassed fields flagged as Spatie\\LaravelData\\Optional.
+```php
+self::getGalleryRules('attachments');
+// attachments.*.file, attachments.*.sort, deleted_attachments_ids
+```
 
-Physical Purging: Identifies if the stale record was an internal file asset. If so, it purges its disk footprint using MediaUploader::deleteFile($medium->file_path) to eliminate dead storage leaks.
+---
 
-Mime-Type Sniffing: If a raw binary upload is supplied, it extracts the mime-type via $file->getMimeType() and automatically categorizes the database media_type attribute column as image, video, audio, or file.
+## Usage — Upload / sync / delete
 
-URL Adaptability: If a plain text URL string is passed instead, it immediately sets the record's database mime_type to link and maps the path to the raw text string directly.
+### Use case 1 — Upload new image (column mode)
 
-Metadata Synchronization: Sequentially maps localized structural descriptions and titles into the media_translations database tables.
+**Request:** `POST multipart/form-data`
 
-6. API Routing & Endpoint Matrix
-   All endpoints leverage a dynamically evaluated polymorphic prefix structure (api/{owner_type}/{owner_id}/media).
-   Method,Endpoint,Target Controller Action,Purpose / Execution Behavior
+```
+image: (file)
+```
 
-GET,/api/{owner_type}/{owner_id}/media,MediaController@index,Lists all associated media for an entity with pagination and filtering support.
-POST,/api/{owner_type}/{owner_id}/media,MediaController@store,Uploads a single media asset; validates via StoreMediaData FormRequest.
-POST,/api/{owner_type}/{owner_id}/media/bulk,MediaController@storeBulk,Batch uploads an array of mixed binaries or URL streams with localized translation rows.
-POST,/api/{owner_type}/{owner_id}/media/bulk-update,MediaController@updateAll,"Batch modifies sort orders, updates default statuses, or adjusts structural metadata."
-DELETE,/api/{owner_type}/{owner_id}/media/bulk-delete,MediaController@deleteBulk,Mass deletes a collection of media assets from both storage disks and the database.
-GET,/api/{owner_type}/{owner_id}/media/{medium},MediaController@show,Fetches details for a single media record along with all registered translation lines.
-POST,/api/{owner_type}/{owner_id}/media/{medium},MediaController@update,In-place asset substitution: Replaces underlying binary files/URLs and localized translations.
-DELETE,/api/{owner_type}/{owner_id}/media/{medium},MediaController@destroy,"Purges a standalone media record, triggers disk cleanup, and reassigns defaults."
+**Result:** Old file deleted → new WebP stored → column updated → `media_status: "uploaded"`.
 
-⚠️ Architectural Note: The {owner_type} parameter must match the Morph Alias registered inside your application's AppServiceProvider via Relation::enforceMorphMap(). Never pass raw namespace paths to the API layer.
+### Use case 2 — Upload via external URL
 
-7. Automated Garbage Collection LifecycleTo prevent dangling file assets or unlinked footprints, the HasMedia trait listens directly to the Eloquent model lifecycle boot sequence.
+**Request:**
 
-```PHP
-public static function bootHasMedia()
+```
+image: https://cdn.example.com/photo.jpg
+```
+
+Stored as URL string in column (no local file). `image_url` returns the URL directly.
+
+### Use case 3 — Delete image
+
+**Request:**
+
+```
+delete_image: true
+```
+
+**Result:** File removed from disk → column set to `null` → `media_status: "deleted"`.
+
+### Use case 4 — Replace image on update
+
+Sending a new `image` file automatically deletes the old file first (built into `uploadSingleImage`).
+
+### Use case 5 — PDF / non-image file
+
+Non-image extensions (pdf, doc, zip) are stored **without** WebP conversion via `storeRawFile()`.
+
+### Use case 6 — Model deleted → cascade cleanup
+
+`HasMedia::bootHasMedia()` on `deleting` / `forceDeleting`:
+
+- Deletes all `$cmsMediaFields` files from disk
+- Deletes all `mediaList` rows and their files
+
+---
+
+## Usage — URL & media objects
+
+### Magic accessors (column mode)
+
+| Access | Example | Returns |
+|--------|---------|---------|
+| `{field}_url` | `$blog->image_url` | Public URL for stored path |
+| `{field}_url_{suffix}` | `$blog->image_url_thumb` | URL with `_thumb` before extension |
+| `{field}_object` | `$blog->image_object` | `{ url, thumb, medium, srcset }` |
+
+### getMediaObject() shape
+
+```json
 {
-    static::deleted(fn($model) => $model->cleanupMediaFiles());
+  "url": "https://example.com/storage/blogs/2024-01-01-abc.webp",
+  "thumb": "https://example.com/storage/blogs/2024-01-01-abc_thumb.webp",
+  "medium": "https://example.com/storage/blogs/2024-01-01-abc_medium.webp",
+  "srcset": "https://.../_thumb.webp 150w, https://.../_medium.webp 600w"
 }
 ```
 
-Execution Flow:When any Eloquent model incorporating HasMedia executes a $model->delete() call:Direct Columns Inspection: It scans the properties configured inside $cmsMediaFields. If any file path string is found, it triggers MediaUploader::deleteFile() to purge it from the targeted filesystem storage disk.Polymorphic Rows Selection: It loads all records configured inside the shared media polymorphic table where owner_id and owner_type match the entity.Cascading Footprint Purging: For each related model, it deletes the database translation rows, triggers disk deletion for the main file and all corresponding scaled image thumbnails, and then deletes the database media row.8. Package Customization & Logic OverridingThe toolkit is designed to be fully extensible. You can easily override core models, actions, or services using Laravel's Service Container bindings.Customizing the Core Media ModelIf you need to add custom relations or helper methods to the Medium model:Create your own model extending the toolkit's base model:
+Requires `$cmsMediaSet` matching a key in `config('cms_media.image_sets')`.
 
-```PHP
-namespace App\\Models;
+### Placeholders
 
-use HMsoft\\Tools\\Features\\Media\\Models\\Medium as BaseMedium;
+When field is empty, `getMediaObject()` returns placeholder URLs from config unless `$cmsNoPlaceholder = true`.
 
-class CustomMedium extends BaseMedium
-{
-    public function customExtraRelation()
-    {
-        return $this->hasOne(CustomMeta::class);
-    }
-}
+---
+
+## Usage — Standalone Media API
+
+Registered at: **`/api/{owner_type}/{owner_id}/media`**
+
+| Method | Route | Description |
+|--------|-------|-------------|
+| GET | `/` | List owner's media (DynamicFilters pagination) |
+| POST | `/` | Upload single file |
+| POST | `/bulk` | Upload multiple files |
+| POST | `/bulk-update` | Update metadata batch |
+| DELETE | `/bulk-delete` | Delete by IDs |
+| GET | `/{medium}` | Show one |
+| POST | `/{medium}` | Update file + metadata |
+| DELETE | `/{medium}` | Delete one |
+
+### Store single — multipart example
+
+```http
+POST /api/blog/5/media
+Content-Type: multipart/form-data
+
+file: (binary)
+is_default: true
+media_type: gallery
+folder: blogs/5/gallery
+locales[0][locale]: en
+locales[0][title]: Hero image
+locales[0][alt]: Blog hero
 ```
 
-Register your custom model in the published configuration file (config/hmsoft-media.php):
+### List with field pruning
 
-```PHP
-'models' => [
-    'medium' => \\App\\Models\\CustomMedium::class,
+```http
+GET /api/blog/5/media?fields=id,file_url,media_type,is_default&page=1&perPage=10
+```
+
+Uses `MediaData::filterableCollect()` (requires app `BaseData`).
+
+> **Morph map:** `{owner_type}` must resolve via Laravel morph map or full class name. Register aliases in `AppServiceProvider` if using short names like `blog`.
+
+---
+
+## Frontend integration
+
+### Single image upload (FormData)
+
+```typescript
+const formData = new FormData();
+formData.append('image', file); // File from input
+
+await fetch(`/api/blogs/${id}/sync-image`, {
+  method: 'POST',
+  body: formData,
+  headers: { Authorization: `Bearer ${token}` },
+});
+```
+
+### Delete image
+
+```typescript
+const formData = new FormData();
+formData.append('delete_image', '1');
+
+await fetch(`/api/blogs/${id}/sync-image`, { method: 'POST', body: formData });
+```
+
+### External URL instead of file
+
+```typescript
+formData.append('image', 'https://cdn.example.com/image.jpg');
+```
+
+### Display in React/Vue
+
+```typescript
+// From API response
+const { url, thumb, srcset } = blog.image ?? blog.image_object;
+
+<img src={thumb ?? url} srcSet={srcset} alt={blog.title} />
+```
+
+### Polymorphic gallery upload
+
+```typescript
+const formData = new FormData();
+files.forEach((file, i) => formData.append(`attachments[${i}][file]`, file));
+
+await fetch(`/api/legislation/${id}/sync-files`, { method: 'POST', body: formData });
+```
+
+### Standalone Media API
+
+```typescript
+const formData = new FormData();
+formData.append('file', file);
+formData.append('media_type', 'attachment');
+formData.append('is_default', 'false');
+
+await fetch(`/api/blog/${blogId}/media`, { method: 'POST', body: formData });
+```
+
+---
+
+## Configuration
+
+Publish config (optional):
+
+```bash
+php artisan vendor:publish --tag=cms_media-config
+```
+
+**`config/cms_media.php`:**
+
+| Key | Env | Default | Description |
+|-----|-----|---------|-------------|
+| `disk` | `MEDIA_DISK` | `public` | Default upload disk |
+| `max_image_dimension` | `MEDIA_MAX_IMAGE_DIMENSION` | `4096` | Max width/height before resize |
+| `placeholders.default` | — | `assets/images/placeholder.png` | Fallback image |
+| `placeholders.models` | — | `{ user: ... }` | Per-model placeholders |
+| `placeholders.fields` | — | `{ icon: ... }` | Per-field placeholders |
+| `image_sets` | — | `default`, `avatar` | Thumbnail size presets |
+
+### Image sets example
+
+```php
+'image_sets' => [
+    'blog_items' => [
+        'thumb'  => ['width' => 150, 'height' => 150],
+        'medium' => ['width' => 600, 'height' => null],
+    ],
+    'gallery_items' => [
+        'thumb' => ['width' => 200, 'height' => 200],
+    ],
 ],
 ```
 
-Overriding Business ActionsIf you want to completely change the upload logic (for example, uploading to a third-party API instead of local/cloud storage), extend the base action and re-bind it in your AppServiceProvider:
+Match `$cmsMediaSet = 'blog_items'` on your model.
 
-```PHP
-namespace App\\Providers;
+### Environment
 
-use Illuminate\\Support\ServiceProvider;
-use HMsoft\\Tools\\Features\\Media\\Actions\\CreateAction;
-use App\\CustomMedia\\CustomCreateAction;
-
-class AppServiceProvider extends ServiceProvider
-{
-    public function register(): void
-    {
-        // Re-bind the package action to your custom execution class
-        $this->app->bind(CreateAction::class, CustomCreateAction::class);
-    }
-}
+```env
+MEDIA_DISK=public
+MEDIA_MAX_IMAGE_DIMENSION=4096
+FILESYSTEM_DISK=public
 ```
+
+---
+
+## Database schema
+
+### `media` table
+
+| Column | Type | Description |
+|--------|------|-------------|
+| `owner_id` | bigint | Polymorphic owner ID |
+| `owner_type` | string | Morph class / alias |
+| `file_path` | text | Storage path or external URL |
+| `file_name` | string | Original filename |
+| `mime_type` | string | MIME or `link` for URLs |
+| `media_type` | string | Logical slot (`image`, `attachment`, `gallery`) |
+| `sort_number` | int | Order in gallery |
+| `is_default` | bool | Default media for owner |
+
+### `media_translations` table
+
+| Column | Description |
+|--------|-------------|
+| `medium_id` | FK → media |
+| `locale` | Language code |
+| `title`, `alt`, `short_description` | Metadata |
+
+Migrations auto-load via `MediaServiceProvider`. Publish with `--tag=cms_media-migrations` if needed.
+
+---
+
+## Troubleshooting
+
+| Problem | Solution |
+|---------|----------|
+| `image_url` is null | Check `$cmsMediaFields` includes `'image'`; column has path |
+| Thumbnails / srcset missing | Define `$cmsMediaSet` + matching `image_sets` in config |
+| Upload works but URL 404 | Run `php artisan storage:link`; check `MEDIA_DISK` |
+| Placeholder wrong | Use `cms_media.placeholders.default` (not `default_placeholder`) |
+| Media API 404 owner | Register morph map for `owner_type` |
+| File not deleted on replace | Check disk matches `$cmsMediaDisk` / config |
+| PDF uploaded as WebP | Non-images skip conversion — verify extension |
+| `delete_image` ignored | Pass `delete_image: true` when no new file |
+| Gallery files not listed | Load `$model->mediaList` or use Media API index |
+
+---
+
+## Extended documentation
+
+| Document | Description |
+|----------|-------------|
+| [docs/00-ANALYSIS-AND-NOTES.md](./docs/00-ANALYSIS-AND-NOTES.md) | Known issues & recommendations |
+| [docs/01-BACKEND-ARCHITECTURE.md](./docs/01-BACKEND-ARCHITECTURE.md) | Internal workflow & classes |
+| [docs/02-BACKEND-INTEGRATION.md](./docs/02-BACKEND-INTEGRATION.md) | Step-by-step integration |
+| [docs/03-FRONTEND-GUIDE.md](./docs/03-FRONTEND-GUIDE.md) | Frontend upload & display |
+| [docs/04-SETUP-CHECKLIST.md](./docs/04-SETUP-CHECKLIST.md) | Printable checklist |
+| [docs/05-COMPLETE-API-REFERENCE.md](./docs/05-COMPLETE-API-REFERENCE.md) | Full API & trait reference |
+
+---
+
+## License
+
+Part of **HMsoft Tools** — internal Laravel package.

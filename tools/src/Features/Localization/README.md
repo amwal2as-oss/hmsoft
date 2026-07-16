@@ -1,143 +1,123 @@
-# Advanced Localization System (Plug-and-Play)
+# Localization Feature
 
-This document provides a comprehensive guide for integrating, using, and customizing the **Localization Feature**. Built on Clean Architecture principles, this component is entirely database-agnostic. It determines the user's preferred language using a smart priority system and allows developers to inject supported locales dynamically from any source (Config, Database, Cache, or external API).
+Plug-and-play locale detection for Laravel APIs and web apps. Database-agnostic; driven by `config/cms_localization.php`.
 
----
+## Quick start
 
-## 1. Core Architecture & Mechanism
-
-The Localization feature operates as a standalone middleware-driven component. It decouples language detection from rigid database structures, relying instead on a configuration-first approach.
-
-### The Detection Priority Engine
-
-When a request passes through the `SetLocaleMiddleware`, the system attempts to detect the correct locale in the following strict order:
-
-1. **Route Parameter (URL Segment):** Checks if the URL contains a valid locale (e.g., `/ar/dashboard`).
-2. **HTTP Header (`Accept-Language`):** Parses the browser or API request header. It intelligently extracts the primary language code (e.g., converting `en-US,en;q=0.9` to `en`). Extremely useful for stateless API consumption.
-3. **Session State:** Checks if the user previously selected a language that was saved in the active session.
-4. **Fallback Locale:** If all the above fail, it defaults to the application's fallback locale defined in the config.
-
----
-
-## 2. Installation & Setup
-
-### Step 1: Register the Service Provider
-
-Ensure the package provider is registered within your application bootstrap (`bootstrap/providers.php` or `config/app.php`):
+### 1. Register the provider
 
 ```php
+// bootstrap/providers.php
 HMsoft\Tools\Features\Localization\Providers\LocalizationServiceProvider::class,
 ```
 
-Step 2: Publish the Configuration File
-Publish the default configuration to your application's config directory so you can modify it:
+Or rely on `HMsoftToolsServiceProvider` (registers Localization automatically).
 
-```Bash
-php artisan vendor:publish --tag="cms-localization-config"
+### 2. Publish config (optional)
+
+```bash
+php artisan vendor:publish --tag=cms-localization-config
 ```
 
-Step 3: Review the Configuration (config/cms_localization.php)
-This file controls the supported locales, the fallback language, and the detection keys:
+### 3. Apply middleware on API routes
 
-```PHP
-<?php
+```php
+// bootstrap/app.php
+$middleware->api(prepend: [
+    'set.locale',
+]);
 
+$middleware->priority([
+    \HMsoft\Tools\Features\OptionalAuth\Middleware\OptionalAuthMiddleware::class,
+    \HMsoft\Tools\Features\Localization\Middleware\SetLocaleMiddleware::class,
+    \Illuminate\Routing\Middleware\SubstituteBindings::class,
+]);
+```
+
+See [Middleware order](./docs/MIDDLEWARE_ORDER.md) — **required** when using slug route binding.
+
+### 4. Send locale from clients
+
+```http
+Accept-Language: ar
+```
+
+---
+
+## Detection priority
+
+When locale is resolved (middleware or `LocaleResolver`):
+
+| Priority | Source | Example |
+|----------|--------|---------|
+| 1 | Route parameter | `/api/ar/news` |
+| 2 | HTTP header | `Accept-Language: ar` |
+| 3 | Session | `session('locale')` |
+| 4 | Fallback | `config('cms_localization.fallback_locale')` |
+
+---
+
+## Core classes
+
+| Class | Purpose |
+|-------|---------|
+| `SetLocaleMiddleware` | Middleware alias `set.locale` — sets `App::setLocale()` per request |
+| `LocaleResolver` | Shared detection engine; safe **before** middleware (route binding, jobs, tests) |
+
+### LocaleResolver usage
+
+```php
+use HMsoft\Tools\Features\Localization\Support\LocaleResolver;
+
+// Read locale only (does not mutate App)
+$locale = LocaleResolver::resolve();
+
+// Read from a specific request
+$locale = LocaleResolver::resolve($request);
+
+// Resolve + apply to App (same as middleware)
+$locale = LocaleResolver::apply($request);
+```
+
+Use `LocaleResolver::resolve()` anywhere `app()->getLocale()` is wrong because middleware has not run yet.
+
+---
+
+## Configuration
+
+`config/cms_localization.php`:
+
+```php
 return [
-    // Array of strictly supported locale codes.
     'supported_locales' => ['ar', 'en'],
-
-    // The default language if detection fails.
-    'fallback_locale' => env('APP_FALLBACK_LOCALE', 'ar'),
-
-    // Keys used by the Middleware to detect the language.
+    'fallback_locale'   => env('APP_FALLBACK_LOCALE', 'ar'),
     'detectors' => [
-        'route_parameter' => 'locale',          // e.g., Route::get('/{locale}/home')
-        'header'          => 'Accept-Language', // Standard HTTP Header
-        'session_key'     => 'locale',          // Session storage key
-    ]
+        'route_parameter' => 'locale',
+        'header'          => 'Accept-Language',
+        'session_key'     => 'locale',
+    ],
 ];
 ```
 
-3. Usage & Integration
-   Once configured, the Service Provider automatically registers a middleware alias: set.locale.
-
-Protecting API Routes (Header-Based Detection)
-Apply the middleware to your API routes. The system will automatically detect the language via the Accept-Language header.
-
-```PHP
-use Illuminate\Support\Facades\Route;
-
-Route::middleware(['api', 'set.locale'])->group(function () {
-    Route::get('/news', [NewsController::class, 'index']);
-    Route::get('/services', [ServiceController::class, 'index']);
-});
-```
-
-Protecting Web Routes (URL & Session-Based Detection)
-Apply it to web routes where the locale might be present in the URL parameter.
-
-```PHP
-use Illuminate\Support\Facades\Route;
-
-Route::middleware(['web', 'set.locale'])->prefix('{locale?}')->group(function () {
-    Route::get('/dashboard', [DashboardController::class, 'index']);
-});
-```
-
-4. Advanced Customization & Dynamic Overriding
-   One of the strongest features of this package is that it doesn't force you to use a static array. You can dynamically override the configuration at runtime.
-
-Dynamic Database Injection (The "Override" Pattern)
-If your main application manages languages via a database table (e.g., a langs table), you can inject those active languages into the Localization package dynamically during the application's boot sequence.
-
-Open your main application's App\Providers\AppServiceProvider.php and override the config:
+Override at runtime (e.g. from DB):
 
 ```php
-namespace App\Providers;
-
-use Illuminate\Support\ServiceProvider;
-use Illuminate\Support\Facades\Schema;
-use Illuminate\Support\Facades\Cache;
-use App\Models\Lang;
-
-class AppServiceProvider extends ServiceProvider
-{
-    public function boot(): void
-    {
-        // Ensure the table exists to prevent errors during initial migrations
-        if (Schema::hasTable('langs')) {
-
-            // Cache the active locales to avoid querying the DB on every single request
-            $activeLocales = Cache::rememberForever('active_locales', function () {
-                return Lang::where('is_active', true)->pluck('locale')->toArray();
-            });
-
-            // Dynamically override the package's supported locales at runtime!
-            config(['cms_localization.supported_locales' => $activeLocales]);
-        }
-    }
-}
+config(['cms_localization.supported_locales' => ['ar', 'en', 'fr']]);
 ```
 
-Extending or Replacing the Middleware
-If your business logic requires a radically different priority engine (for instance, reading the locale from an authenticated User's profile before checking the session), you can easily override the middleware binding.
+---
 
-In your AppServiceProvider:
+## Documentation index
 
-```PHP
-use HMsoft\Tools\Features\Localization\Middleware\SetLocaleMiddleware;
-use App\Http\Middleware\MyCustomLocaleMiddleware;
+| Doc | Description |
+|-----|-------------|
+| [MIDDLEWARE_ORDER.md](./docs/MIDDLEWARE_ORDER.md) | Why `set.locale` must run before route model binding |
+| [ROUTE_MODEL_BINDING.md](./docs/ROUTE_MODEL_BINDING.md) | Slug + ID show endpoints with `LocaleResolver` |
+| [API_REFERENCE.md](./docs/API_REFERENCE.md) | Config keys, classes, and client headers |
 
-public function boot(\Illuminate\Routing\Router $router): void
-{
-    // Override the package's alias with your custom middleware implementation
-    $router->aliasMiddleware('set.locale', MyCustomLocaleMiddleware::class);
-}
-```
+---
 
-5. Summary of Benefits
-   Zero Database Coupling: Works perfectly out-of-the-box using pure PHP arrays, making it highly portable.
+## Related HMsoft features
 
-RESTful API Ready: Automatically parses HTTP headers, eliminating the need to pass ?lang=en in every API query string.
-
-Highly Cacheable: Because it relies on Laravel's Config repository, it integrates perfectly with php artisan config:cache and custom Cache drivers.
+- **Translations** — `HasTranslations` trait uses `app()->getLocale()` for `translation()` relation
+- **Optional Auth** — runs before locale in recommended priority stack

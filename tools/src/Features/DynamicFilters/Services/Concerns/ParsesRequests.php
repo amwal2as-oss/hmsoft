@@ -13,6 +13,12 @@ use Illuminate\Support\Collection;
 
 trait ParsesRequests
 {
+    /**
+     * Build DynamicFilterData from explicit args or the current HTTP request.
+     *
+     * Reads: page, perPage/per_page/limit, filters, sorting, advanceFilter, globalFilter, fields, count_only.
+     * Applies cmsDefaultFilters/cmsDefaultSorts when request has no filters/sorting.
+     */
     public function initializeDynamicFilterData(
         ?DynamicFilterData $dynamicFilterData = null,
         ?Request $request = null,
@@ -148,6 +154,9 @@ trait ParsesRequests
         return json_decode(json_encode($advanceFilter), false);
     }
 
+    /**
+     * Decode base64 (+ optional gzip) JSON payloads from query string parameters.
+     */
     private static function smartDecode(string $encodedData, string $paramName = 'data'): ?array
     {
         $b64Standard = str_replace(['-', '_'], ['+', '/'], $encodedData);

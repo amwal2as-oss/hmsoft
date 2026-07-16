@@ -2,7 +2,6 @@
 
 namespace HMsoft\Tools\Features\DynamicFilters\Services;
 
-use HMsoft\Tools\Features\DynamicFilters\Services\JoinManager;
 use HMsoft\Tools\Features\DynamicFilters\Contracts\AutoFilterable;
 use HMsoft\Tools\Features\DynamicFilters\Data\DynamicFilterData;
 use HMsoft\Tools\Features\DynamicFilters\Data\ColumnFilterData;
@@ -12,6 +11,17 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\Cache;
 
+/**
+ * Builds Eloquent queries from URL/request parameters: filters, sorting, global search, pagination.
+ *
+ * Entry points:
+ * - {@see dynamicSearchFromRequest()} — read query string and return paginated array
+ * - {@see buildQuery()} — return Builder only (for custom pipelines)
+ * - {@see dynamicFilter()} — execute query with pagination format from DynamicFilterData
+ *
+ * @see docs/01-BACKEND-ARCHITECTURE.md Full workflow documentation
+ * @see docs/02-BACKEND-INTEGRATION.md   Step-by-step integration guide
+ */
 class AutoFilterAndSortService
 {
     // استدعاء جميع المكونات (Concerns)
@@ -50,7 +60,9 @@ class AutoFilterAndSortService
             }
 
             $this->model = $modelInstance;
-        } elseif (!$model instanceof Model) {
+        } elseif ($model instanceof Model) {
+            $this->model = $model;
+        } else {
             throw new \Exception("Model must be an instance of Illuminate\Database\Eloquent\Model or a class name.");
         }
     }
@@ -151,9 +163,13 @@ class AutoFilterAndSortService
             }
         }
 
-        // 5. تطبيق البحث العام (Global Search)
+        // 5. Apply global search (Global Search)
         if (isset($dynamicFilterData->globalFilter) && !empty($dynamicFilterData->globalFilter)) {
-            $this->applyGlobalFilter($query, $dynamicFilterData->globalFilter);
+            $this->applyGlobalFilter(
+                $query,
+                $dynamicFilterData->globalFilter,
+                $dynamicFilterData->globaleFilterExtraOperation
+            );
         }
 
         // 6. العمليات الإضافية المحقونة
@@ -171,7 +187,9 @@ class AutoFilterAndSortService
             self::handelSorting($query, $sortingKeys, $this->joinManager);
         }
 
-        info($query->toRawSql());
+        if (config('app.debug') && config('hmsoft-tools.log_dynamic_filter_queries', false)) {
+            logger()->debug('DynamicFilters query', ['sql' => $query->toRawSql()]);
+        }
 
         return $query;
     }

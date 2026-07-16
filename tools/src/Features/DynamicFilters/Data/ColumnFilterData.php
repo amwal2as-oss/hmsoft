@@ -6,14 +6,21 @@ use HMsoft\Tools\Features\DynamicFilters\Enums\FilterFnsEnum;
 use Spatie\LaravelData\Data;
 use Illuminate\Contracts\Database\Query\Expression;
 
+/**
+ * Single column filter rule mapped to a SQL WHERE clause.
+ *
+ * Filter function names match the frontend Material React Table / TanStack filter fns.
+ *
+ * @see FilterFnsEnum Supported operators
+ */
 class ColumnFilterData extends Data
 {
     /**
-     * @param string|Expression|null $id column name or raw SQL expression.
-     * @param string|array $value filter value.
-     * @param FilterFnsEnum filter function.
-     * @param string|null $columnPrefix column prefix.
-     * @param bool $autoAddPrefixFromCurrentModel auto Add Prefix From Current Model.
+     * @param string|Expression|null $id Column name, dot-path, or raw SQL expression
+     * @param string|array|null $value Filter value (array for `in`, `between`, etc.)
+     * @param FilterFnsEnum $filterFns Operator
+     * @param string|null $columnPrefix Optional table alias prefix
+     * @param bool $autoAddPrefixFromCurrentModel Prepend main model table name to bare columns
      */
     public function __construct(
         public string|Expression|null $id,
@@ -23,6 +30,9 @@ class ColumnFilterData extends Data
         public bool        $autoAddPrefixFromCurrentModel = false,
     ) {}
 
+    /**
+     * Apply this filter to a query builder using the configured operator.
+     */
     function buildQueryWhereStatment(
         \Illuminate\Database\Eloquent\Builder|\Illuminate\Database\Query\Builder &$queryBuilder,
         ColumnFilterData $columnFilterData,
@@ -105,9 +115,17 @@ class ColumnFilterData extends Data
                 $queryBuilder->{$whereMethod}($columnName, '=', $value);
                 break;
             case FilterFnsEnum::notEquals:
-                // We use NOT LIKE here but usually for exact mismatch.
-                // Escaping ensures we don't accidentally wildcard match.
-                $queryBuilder->{$whereMethod}($columnName, 'NOT LIKE', $escapeLike($value));
+            case FilterFnsEnum::weakEquals:
+                $queryBuilder->{$whereMethod}($columnName, '!=', $value);
+                break;
+            case FilterFnsEnum::equalsString:
+                $queryBuilder->{$whereMethod}($columnName, '=', (string) $value);
+                break;
+            case FilterFnsEnum::isNull:
+                $queryBuilder->{$whereMethod . 'Null'}($columnName);
+                break;
+            case FilterFnsEnum::notIsNull:
+                $queryBuilder->{$whereMethod . 'NotNull'}($columnName);
                 break;
             case FilterFnsEnum::greaterThan:
                 $queryBuilder->{$whereMethod}($columnName, '>', $value);
@@ -184,9 +202,10 @@ class ColumnFilterData extends Data
                 $queryBuilder->{$whereMethod}($columnName, '<>', '');
                 break;
             case FilterFnsEnum::includesStringSensitive:
-                // Escape first, then uppercase, to be safe.
-                $escapedValue = strtoupper($escapeLike($value));
-                $queryBuilder->{$whereMethod . 'Raw'}("UPPER($columnName) LIKE '%" . $escapedValue . "%'");
+                $queryBuilder->{$whereMethod . 'Raw'}(
+                    "UPPER({$columnName}) LIKE ?",
+                    ['%' . strtoupper($escapeLike($value)) . '%']
+                );
                 break;
         }
         return $queryBuilder;

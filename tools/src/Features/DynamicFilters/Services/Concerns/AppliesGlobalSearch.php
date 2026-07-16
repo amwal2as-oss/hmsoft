@@ -4,19 +4,28 @@ namespace HMsoft\Tools\Features\DynamicFilters\Services\Concerns;
 
 use Illuminate\Database\Eloquent\Builder;
 
+/**
+ * Applies OR-based global search across base columns and configured relations.
+ */
 trait AppliesGlobalSearch
 {
-    private function applyGlobalFilter(Builder $query, string $globalFilterValue): void
+    /**
+     * Wrap all searchable columns in a single OR group.
+     *
+     * @param callable(Builder, string): void|null $extraOperation Optional hook to append custom search clauses
+     */
+    private function applyGlobalFilter(Builder $query, string $globalFilterValue, ?callable $extraOperation = null): void
     {
         $mainTableAlias = $this->joinManager->getMainTableAlias();
-        $fullTextColumns = method_exists($this->model, 'defineFullTextSearchableAttributes') ? $this->model->defineFullTextSearchableAttributes() : [];
-        $fieldMap = method_exists($this->model, 'defineFieldSelectionMap') ? $this->model->defineFieldSelectionMap() : [];
+        $fullTextColumns = method_exists($this->model, 'defineFullTextSearchableAttributes')
+            ? $this->model->defineFullTextSearchableAttributes()
+            : [];
 
         $safeMatchValue = trim(preg_replace('/[+\-><\(\)~*\"@]+/', ' ', $globalFilterValue));
         $matchValue = empty($safeMatchValue) ? '' : $safeMatchValue . '*';
-        $likeValue  = '%' . trim($globalFilterValue) . '%';
+        $likeValue  = '%' . addcslashes(trim($globalFilterValue), '%_\\') . '%';
 
-        $query->where(function (Builder $builder) use ($matchValue, $likeValue, $mainTableAlias, $fullTextColumns, $fieldMap, $query) {
+        $query->where(function (Builder $builder) use ($matchValue, $likeValue, $mainTableAlias, $fullTextColumns, $extraOperation, $globalFilterValue) {
             $baseAttributes = $this->model->defineGlobalSearchBaseAttributes();
             foreach ($baseAttributes as $col) {
                 if ($matchValue !== '' && in_array($col, $fullTextColumns)) {
@@ -31,7 +40,9 @@ trait AppliesGlobalSearch
 
                 foreach ($relatedSearchAttrs as $relationPath => $columns) {
                     $rootRelation = explode('.', $relationPath)[0];
-                    if (!method_exists($this->model, \Illuminate\Support\Str::camel($rootRelation))) continue;
+                    if (!method_exists($this->model, \Illuminate\Support\Str::camel($rootRelation))) {
+                        continue;
+                    }
 
                     $relationInstance = $this->model->{\Illuminate\Support\Str::camel($rootRelation)}();
 
@@ -42,14 +53,18 @@ trait AppliesGlobalSearch
                     }
                 }
             }
+
+            if ($extraOperation !== null) {
+                $extraOperation($builder, $globalFilterValue);
+            }
         });
     }
 
     private function applyMorphGlobalSearch(Builder $builder, $relationPath, $rootRelation, $columns, $matchValue, $likeValue, $fullTextColumns): void
     {
         if ($relationPath === $rootRelation) {
-            $builder->orWhereHasMorph($relationPath, '*', function ($q) use ($columns, $matchValue, $likeValue, $fullTextColumns, $relationPath) {
-                $q->where(function ($subQ) use ($columns, $matchValue, $likeValue, $relationPath, $fullTextColumns) {
+            $builder->orWhereHasMorph($relationPath, '*', function ($q) use ($columns, $likeValue) {
+                $q->where(function ($subQ) use ($columns, $likeValue) {
                     foreach ($columns as $column) {
                         $subQ->orWhere($column, 'LIKE', $likeValue);
                     }
@@ -57,9 +72,9 @@ trait AppliesGlobalSearch
             });
         } else {
             $remainingPath = substr($relationPath, strlen($rootRelation) + 1);
-            $builder->orWhereHasMorph($rootRelation, '*', function ($q) use ($remainingPath, $columns, $matchValue, $likeValue, $fullTextColumns, $relationPath) {
-                $q->whereHas($remainingPath, function ($subQ2) use ($columns, $matchValue, $likeValue, $relationPath, $fullTextColumns) {
-                    $subQ2->where(function ($subQ) use ($columns, $matchValue, $likeValue, $relationPath, $fullTextColumns) {
+            $builder->orWhereHasMorph($rootRelation, '*', function ($q) use ($remainingPath, $columns, $likeValue) {
+                $q->whereHas($remainingPath, function ($subQ2) use ($columns, $likeValue) {
+                    $subQ2->where(function ($subQ) use ($columns, $likeValue) {
                         foreach ($columns as $column) {
                             $subQ->orWhere($column, 'LIKE', $likeValue);
                         }

@@ -14,6 +14,7 @@ use HMsoft\Tools\Features\Audit\Listeners\LogAuthenticationEvent;
 use HMsoft\Tools\Features\Audit\Commands\VerifySystemState;
 use HMsoft\Tools\Features\Audit\Commands\VerifyAuditLedger;
 use Illuminate\Support\Facades\Route;
+use Illuminate\Support\Facades\Schema;
 use HMsoft\Tools\Features\Audit\Models\AuditLog;
 
 class AuditServiceProvider extends ServiceProvider
@@ -43,44 +44,7 @@ class AuditServiceProvider extends ServiceProvider
 
 
         // Dynamically scan and cache the Morph Map
-        $morphMap = Cache::rememberForever('system_morph_map', function () {
-            $map = [];
-            $featuresPath = app_path('Features');
-
-            if (!File::exists($featuresPath)) {
-                return $map;
-            }
-
-           foreach (File::allFiles($featuresPath) as $file) {
-                if (str_contains($file->getPathname(), DIRECTORY_SEPARATOR . 'Models' . DIRECTORY_SEPARATOR) && $file->getExtension() === 'php') {
-
-                    $relativePath = str_replace(['/', '.php'], ['\\', ''], $file->getRelativePathname());
-                    $class = 'App\\Features\\' . $relativePath;
-
-                    if (class_exists($class) && is_subclass_of($class, \Illuminate\Database\Eloquent\Model::class)) {
-                        $model = new $class;
-                        
-                        // 🔥 THE GLOBAL FIX 🔥
-                        // If the developer defined a custom alias, use it. 
-                        // If not, automatically use the database table name to appease the CMS!
-
-                         $alias = $model->getTable();
-                         try{
-                             $alias = $model->getMorphClass() !== $class 
-                                         ? $model->getMorphClass() 
-                                         : $model->getTable();
-                         }catch(\Exception $e){
-                         }
-
-                        $map[$alias] = $class;
-                    }
-                }
-            }
-
-            return $map;
-        });
-
-        Relation::enforceMorphMap($morphMap);
+        Relation::enforceMorphMap($this->resolveMorphMap());
 
         // Register Console Commands
         if ($this->app->runningInConsole()) {
@@ -101,5 +65,70 @@ class AuditServiceProvider extends ServiceProvider
         Route::prefix('api')         // إضافة بادئة الـ API العامة
             ->middleware('api')         // تطبيق حماية الـ API الافتراضية
             ->group(__DIR__ . '/../Routes/api.php');
+    }
+
+    protected function resolveMorphMap(): array
+    {
+        $resolver = fn (): array => $this->buildMorphMap();
+
+        if (! $this->canUseCacheStore()) {
+            return $resolver();
+        }
+
+        try {
+            return Cache::rememberForever('system_morph_map', $resolver);
+        } catch (\Throwable) {
+            return $resolver();
+        }
+    }
+
+    protected function canUseCacheStore(): bool
+    {
+        if (config('cache.default') !== 'database') {
+            return true;
+        }
+
+        try {
+            return Schema::hasTable(config('cache.stores.database.table', 'cache'));
+        } catch (\Throwable) {
+            return false;
+        }
+    }
+
+    protected function buildMorphMap(): array
+    {
+        $map = [];
+        $featuresPath = app_path('Features');
+
+        if (! File::exists($featuresPath)) {
+            return $map;
+        }
+
+        foreach (File::allFiles($featuresPath) as $file) {
+            if (! str_contains($file->getPathname(), DIRECTORY_SEPARATOR . 'Models' . DIRECTORY_SEPARATOR) || $file->getExtension() !== 'php') {
+                continue;
+            }
+
+            $relativePath = str_replace(['/', '.php'], ['\\', ''], $file->getRelativePathname());
+            $class = 'App\\Features\\' . $relativePath;
+
+            if (! class_exists($class) || ! is_subclass_of($class, \Illuminate\Database\Eloquent\Model::class)) {
+                continue;
+            }
+
+            $model = new $class;
+            $alias = $model->getTable();
+
+            try {
+                $alias = $model->getMorphClass() !== $class
+                    ? $model->getMorphClass()
+                    : $model->getTable();
+            } catch (\Exception) {
+            }
+
+            $map[$alias] = $class;
+        }
+
+        return $map;
     }
 }

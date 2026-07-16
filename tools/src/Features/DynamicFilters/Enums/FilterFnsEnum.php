@@ -5,6 +5,11 @@ namespace HMsoft\Tools\Features\DynamicFilters\Enums;
 use ArchTech\Enums\Names;
 use ArchTech\Enums\From;
 
+/**
+ * Filter operators shared between backend SQL builder and frontend table libraries.
+ *
+ * Values are sent as strings in the `filters` query payload (e.g. `"filterFns": "equals"`).
+ */
 enum FilterFnsEnum: string
 {
     use From, Names;

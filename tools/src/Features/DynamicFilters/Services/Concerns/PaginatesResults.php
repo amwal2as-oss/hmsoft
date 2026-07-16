@@ -6,6 +6,9 @@ use HMsoft\Tools\Features\DynamicFilters\Enums\PaginationFormateEnum;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\DB;
 
+/**
+ * Formats query results according to PaginationFormateEnum.
+ */
 trait PaginatesResults
 {
     protected function handleCountOnly(Builder $query): array

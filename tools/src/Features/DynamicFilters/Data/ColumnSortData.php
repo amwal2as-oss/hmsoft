@@ -5,11 +5,14 @@ namespace HMsoft\Tools\Features\DynamicFilters\Data;
 use Spatie\LaravelData\Data;
 use Illuminate\Database\Eloquent\Builder;
 
+/**
+ * Single sort directive. Relation sorts are resolved by AppliesSorting via JoinManager.
+ */
 class ColumnSortData extends Data
 {
     /**
-     * @param string $id column name.
-     * @param bool $desc is desc mode.
+     * @param string|null $id Column or dot-path (e.g. `translation.title`)
+     * @param bool|null $desc True for DESC, false for ASC
      */
     public function __construct(
         public string |null $id,
