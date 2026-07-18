@@ -16,6 +16,7 @@ use HMsoft\Tools\Features\Audit\Commands\VerifyAuditLedger;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\Schema;
 use HMsoft\Tools\Features\Audit\Models\AuditLog;
+use HMsoft\Tools\Features\Audit\Support\AuditConfig;
 
 class AuditServiceProvider extends ServiceProvider
 {
@@ -24,7 +25,10 @@ class AuditServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
-        // 
+        $this->mergeConfigFrom(
+            __DIR__ . '/../config/cms_audit.php',
+            'cms_audit'
+        );
     }
 
     /**
@@ -32,32 +36,41 @@ class AuditServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
+        if ($this->app->runningInConsole()) {
+            $this->publishes([
+                __DIR__ . '/../config/cms_audit.php' => config_path('cms_audit.php'),
+            ], 'cms-audit-config');
+        }
 
+        if (AuditConfig::shouldLoadMigrations()) {
+            $this->loadMigrationsFrom(__DIR__ . '/../Database/Migrations');
+        }
 
-        $this->loadMigrationsFrom(__DIR__ . '/../Database/Migrations');
+        if (AuditConfig::shouldRegisterRoutes()) {
+            $this->registerRoutes();
+        }
 
-        $this->registerRoutes();
-
-           Relation::enforceMorphMap([
-            'audit_log' => AuditLog::class,
-        ]);
-
+        if (AuditConfig::isEnabled()) {
+            Relation::enforceMorphMap([
+                'audit_log' => AuditLog::class,
+            ]);
+        }
 
         // Dynamically scan and cache the Morph Map
         Relation::enforceMorphMap($this->resolveMorphMap());
 
-        // Register Console Commands
-        if ($this->app->runningInConsole()) {
+        if ($this->app->runningInConsole() && AuditConfig::isEnabled()) {
             $this->commands([
                 VerifySystemState::class,
                 VerifyAuditLedger::class,
             ]);
         }
 
-        // Register Authentication Event Listeners
-        Event::listen(Login::class, LogAuthenticationEvent::class);
-        Event::listen(Failed::class, LogAuthenticationEvent::class);
-        Event::listen(Logout::class, LogAuthenticationEvent::class);
+        if (AuditConfig::shouldLogAuthentication()) {
+            Event::listen(Login::class, LogAuthenticationEvent::class);
+            Event::listen(Failed::class, LogAuthenticationEvent::class);
+            Event::listen(Logout::class, LogAuthenticationEvent::class);
+        }
     }
 
     protected function registerRoutes(): void

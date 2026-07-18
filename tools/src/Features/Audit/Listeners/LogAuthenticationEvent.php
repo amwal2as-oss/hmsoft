@@ -3,6 +3,7 @@
 namespace HMsoft\Tools\Features\Audit\Listeners;
 
 use HMsoft\Tools\Features\Audit\Jobs\ProcessAuditLogJob;
+use HMsoft\Tools\Features\Audit\Support\AuditConfig;
 use Illuminate\Auth\Events\Login;
 use Illuminate\Auth\Events\Failed;
 use Illuminate\Auth\Events\Logout;
@@ -15,6 +16,10 @@ class LogAuthenticationEvent
      */
     public function handle(Login|Failed|Logout $event): void
     {
+        if (! AuditConfig::shouldLogAuthentication()) {
+            return;
+        }
+
         // 1. Determine what happened
         $action = match (true) {
             $event instanceof Login => 'logged_in',

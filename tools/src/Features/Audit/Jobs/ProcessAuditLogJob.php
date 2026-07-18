@@ -3,6 +3,7 @@
 namespace HMsoft\Tools\Features\Audit\Jobs;
 
 use HMsoft\Tools\Features\Audit\Models\AuditLog;
+use HMsoft\Tools\Features\Audit\Support\AuditConfig;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
@@ -25,6 +26,10 @@ class ProcessAuditLogJob implements ShouldQueue
 
     public function handle(): void
     {
+        if (! AuditConfig::isEnabled()) {
+            return;
+        }
+
         DB::transaction(function () {
             // Lock the latest row to prevent race conditions during concurrent writes
             $lastLog = AuditLog::lockForUpdate()->latest('id')->first();

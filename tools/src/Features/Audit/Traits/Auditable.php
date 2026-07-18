@@ -3,6 +3,7 @@
 namespace HMsoft\Tools\Features\Audit\Traits;
 
 use HMsoft\Tools\Features\Audit\Jobs\ProcessAuditLogJob;
+use HMsoft\Tools\Features\Audit\Support\AuditConfig;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Request;
 
@@ -10,6 +11,10 @@ trait Auditable
 {
     public static function bootAuditable(): void
     {
+        if (! AuditConfig::shouldLogModelEvents()) {
+            return;
+        }
+
         static::created(function (Model $model) {
             self::dispatchAudit($model, 'created', [], $model->toArray());
         });
@@ -28,6 +33,10 @@ trait Auditable
 
     protected static function dispatchAudit(Model $model, string $event, array $oldValues, array $newValues): void
     {
+        if (! AuditConfig::shouldLogModelEvents()) {
+            return;
+        }
+
         // Strip out hidden/internal attributes like passwords or remember_tokens if necessary
         $hidden = $model->getHidden();
         $oldValues = array_diff_key($oldValues, array_flip($hidden));

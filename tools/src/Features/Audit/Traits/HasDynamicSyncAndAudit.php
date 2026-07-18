@@ -3,6 +3,7 @@
 namespace HMsoft\Tools\Features\Audit\Traits;
 
 use HMsoft\Tools\Features\Audit\Jobs\ProcessAuditLogJob;
+use HMsoft\Tools\Features\Audit\Support\AuditConfig;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\Arr;
@@ -121,6 +122,10 @@ trait HasDynamicSyncAndAudit
      */
     private function triggerAuditIfChanged(string $relationName, array $oldData, array $newData): void
     {
+        if (! AuditConfig::shouldLogRelationSync()) {
+            return;
+        }
+
         if (json_encode($oldData) !== json_encode($newData)) {
             
             $actionStatus = empty($oldData) ? 'created' : 'updated';

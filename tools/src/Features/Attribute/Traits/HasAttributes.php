@@ -2,20 +2,15 @@
 
 namespace HMsoft\Tools\Features\Attribute\Traits;
 
-use HMsoft\Tools\Features\Attribute\Models\AttributeValue;
-use Illuminate\Database\Eloquent\Relations\MorphMany;
-
+/**
+ * @deprecated Use HasEavAttributes
+ */
 trait HasAttributes
 {
-    public static function bootHasAttributes()
-    {
-        static::deleting(function ($model) {
-            $model->attributeValues()->delete();
-        });
-    }
+    use HasEavAttributes;
 
-    public function attributeValues(): MorphMany
+    public static function bootHasAttributes(): void
     {
-        return $this->morphMany(AttributeValue::class, 'owner');
+        static::bootHasEavAttributes();
     }
 }

@@ -2,8 +2,8 @@
 
 namespace HMsoft\Tools\Features\Attribute\Service;
 
-use HMsoft\Tools\Features\Attribute\Actions\{CreateAction, DeleteAction, GetListAction, SyncImageAction, UpdateAction, UpdateBulkAction};
-use HMsoft\Tools\Features\Attribute\Data\{StoreAttributeData, SyncAttributeImageData, UpdateAllAttributesData, UpdateAttributeData};
+use HMsoft\Tools\Features\Attribute\Actions\{CreateAction, DeleteAction, GetListAction, GetObjectAttributesAction, SyncImageAction, UpdateAction, UpdateBulkAction};
+use HMsoft\Tools\Features\Attribute\Data\{AttributeData, StoreAttributeData, SyncAttributeImageData, UpdateAllAttributesData, UpdateAttributeData};
 use HMsoft\Tools\Features\Attribute\Models\Attribute;
 
 class AttributeService
@@ -14,12 +14,29 @@ class AttributeService
         private readonly UpdateBulkAction $update_bulk_action,
         private readonly DeleteAction $delete_action,
         private readonly GetListAction $get_list_action,
+        private readonly GetObjectAttributesAction $get_object_attributes_action,
         private readonly SyncImageAction $sync_image_action
     ) {}
 
     public function list(string $scope): array
     {
         return $this->get_list_action->execute($scope);
+    }
+
+    public function forObject(
+        string $entityType,
+        int|string $valuableId,
+        ?string $categoryType = null,
+        ?int $categoryId = null,
+    ): array {
+        $rows = $this->get_object_attributes_action->execute(
+            entityType: $entityType,
+            valuableId: $valuableId,
+            categoryType: $categoryType,
+            categoryId: $categoryId,
+        );
+
+        return AttributeData::collectWithValues($rows);
     }
 
     public function store(StoreAttributeData $data): Attribute

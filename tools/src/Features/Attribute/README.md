@@ -1,130 +1,113 @@
-2. Attribute Feature (EAV System)
-   The Attribute feature provides a robust Entity-Attribute-Value (EAV) infrastructure, allowing fields (such as text, select dropdowns, checkboxes, etc.) to be created dynamically and bound onto any application domain model.
+# EAV Feature (Hybrid Dynamic Attributes)
 
-Basic Usage
+Enterprise-grade Entity-Attribute-Value engine for Laravel CMS APIs. Attach custom typed fields to any model with translations, category scoping, and AutoFilter support.
 
-1. Prepare your Domain Model
-   Incorporate the HasAttributes trait into your target entity (e.g., Product, Post):
+**Package path:** `vendor/hmsoft/tools/tools/src/Features/Attribute`
+
+---
+
+## What it does
+
+| Capability | Description |
+|------------|-------------|
+| **Morph values** | Store attribute values on any Eloquent model via `valuable_type` morph alias |
+| **10 input types** | text, textarea, select, multi_select, radio, checkbox, color, number, date, boolean |
+| **Translations** | Attribute labels, option labels, and translatable text values |
+| **Category scoping** | Limit attributes to specific categories per entity |
+| **Typed storage** | Indexed columns for fast filter/sort (`value_number`, `value_date`, etc.) |
+| **AutoFilter keys** | Dynamic filter keys like `eav.weight`, `eav.material` |
+| **Config control** | Enable/disable via `config/cms_eav.php` |
+
+---
+
+## Quick start
+
+### 1. Register the provider
 
 ```php
-<?php
-
-namespace App\Features\Product\Models;
-
-use Illuminate\Database\Eloquent\Model;
-use HMsoft\Tools\Features\Attribute\Traits\HasAttributes;
-
-class Product extends Model
-{
-    use HasAttributes;
-
-    protected $table = 'products';
-}
+// bootstrap/providers.php
+HMsoft\Tools\Features\Attribute\Providers\AttributeServiceProvider::class,
 ```
 
-2. Synchronize EAV Values in your Pipeline
-   When storing or updating your model payload, utilize the dedicated SyncNestedAttributesAction execution wrapper to handle casting and structural saving seamlessly:
+### 2. Publish config
 
-```php
-<?php
-
-namespace App\Features\Product\Actions;
-
-use App\Features\Product\Models\Product;
-use HMsoft\Tools\Features\Attribute\Traits\SyncNestedAttributesAction;
-
-class StoreProductAction
-{
-    public function execute(array $payload): Product
-    {
-        $product = Product::create($payload['basic_info']);
-
-        // Sync EAV attributes array matching types (checkbox, translatable text, text fields)
-        (new SyncNestedAttributesAction())->execute($product, $payload['attributes'] ?? []);
-
-        return $product;
-    }
-}
+```bash
+php artisan vendor:publish --tag=cms-eav-config
+php artisan migrate
 ```
 
-How to Override Attributes Configuration
-Scope Customization
-The package routes are scoped dynamically through URLs (e.g., /api/product/attributes). The context validation rules automatically deduce scope matching. If you want to bypass or hardcode specific boundaries, override prepareForPipeline inside StoreAttributeData or UpdateAttributeData:
+### 3. Add trait to a model
 
 ```php
-public static function prepareForPipeline(array $properties): array
-{
-    // Force a specific immutable domain partition scope
-    $properties['scope'] = 'e_commerce_products';
-    return $properties;
-}
-```
-
-EAV Value Parsing Type Modification
-If you add specialized proprietary attribute field variations (e.g., markdown, color_picker), append the structural blueprint handling matrices within SyncNestedAttributesAction or extend DynamicValueCast.
-
-3. Faq Feature (Polymorphic Contexts)
-   The refined Faq feature supports highly flexible contextual polymorphic bindings executing flawlessly under three unified structural operational shapes.
-
-Three Structural Shapes
-
-Pattern,API Route Example,Description
-Shape 1: General FAQs,GET /api/faqs,System-wide general FAQs (owner_type and owner_id are both null).
-Shape 2: Entity Bound FAQs,GET /api/blogs/15/faqs,"FAQs associated with a specific entity record (owner_type = 'blog', owner_id = '15')."
-Shape 3: Entity Type FAQs,GET /api/blogs/faqs,"General FAQs bound across an entire entity structure scope (owner_type = 'blog', owner_id = null)."
-
-Basic Usage
-Include the relation interface map using the explicit HasFaqs trait on target domain layers:
-
-```php
-<?php
-
-namespace App\Features\Blog\Models;
-
-use Illuminate\Database\Eloquent\Model;
-use App\Features\Faq\Traits\HasFaqs;
+use HMsoft\Tools\Features\Attribute\Traits\HasEavAttributes;
 
 class Blog extends Model
 {
-    use HasFaqs;
-}
-```
+    use HasEavAttributes;
 
-Syncing Inline Nested Elements via Parent Actions
-
-```php
-use App\Features\Faq\Actions\SyncNestedFaqsAction;
-
-// Synchronizes and updates cascading translations automatically on nested structural requests
-(new SyncNestedFaqsAction())->execute($blogModel, $request->input('faqs', []));
-```
-
-How to Override FAQ Dynamic Resolving
-The core mechanism powering the three operational shapes relies on ExtractsOwnerFromRoute. If your application infrastructure utilizes specialized route model binding terms or unique prefixes, you can override how the package discovers entity anchors.
-
-Overriding Route Owner Resolution
-You can easily override the parsing strategy inside FaqController or the Data Transfer Objects by modifying getOwnerFromRoute:
-
-```php
-<?php
-
-namespace App\Features\Faq\Traits;
-
-trait ExtractsOwnerFromRoute
-{
-    public static function getOwnerFromRoute(): array
+    public function getMorphClass(): string
     {
-        $request = request();
-
-        // CUSTOM OVERRIDE: e.g., Resolving ownership header values or custom parameter matching
-        if ($request->hasHeader('X-Custom-Faq-Scope')) {
-            return [
-                'owner_id'   => $request->header('X-Custom-Faq-Id'),
-                'owner_type' => $request->header('X-Custom-Faq-Scope'),
-            ];
-        }
-
-        // Default automated cascading route parameter detection fallback...
+        return 'blogs';
     }
 }
 ```
+
+### 4. Sync values on create/update
+
+```php
+$blog->syncEavAttributes([
+    ['code' => 'weight', 'value' => 12.5],
+]);
+```
+
+### 5. Load attributes with values (edit form)
+
+```http
+GET /api/blogs/15/attributes
+```
+
+Or in PHP:
+
+```php
+$fields = $blog->getEavAttributesWithValues();
+```
+
+---
+
+## Documentation index
+
+| Doc | Description |
+|-----|-------------|
+| [ARCHITECTURE.md](./docs/ARCHITECTURE.md) | Tables, typed storage, morph aliases |
+| [DATABASE_SCHEMA.md](./docs/DATABASE_SCHEMA.md) | Full column reference + indexes |
+| [CONFIGURATION.md](./docs/CONFIGURATION.md) | Config keys and env vars |
+| [DEVELOPER_GUIDE.md](./docs/DEVELOPER_GUIDE.md) | Traits, sync payloads, types |
+| [FRONTEND_REFERENCE.md](./docs/FRONTEND_REFERENCE.md) | **Frontend / mobile integration guide** |
+| [POSTMAN_API.md](./docs/POSTMAN_API.md) | **HTTP examples with request/response bodies** |
+| [API_REFERENCE.md](./docs/API_REFERENCE.md) | Models, enums, services |
+| [FILTERING.md](./docs/FILTERING.md) | AutoFilterAndSortService integration |
+
+---
+
+## Core classes
+
+| Class | Purpose |
+|-------|---------|
+| `HasEavAttributes` | Trait — morph relation + `syncEavAttributes()` |
+| `EavValueSyncService` | Persist values on create/update |
+| `GetObjectAttributesAction` | Load definitions + values for one object |
+| `EavValuePresenter` | Resolves DB row → frontend `value` shape |
+| `EavFilterRegistrar` | Registers dynamic filter keys per `entity_type` |
+| `InputTypeEnum` | UI input types |
+| `ValueTypeEnum` | Storage strategy |
+| `Attribute` | EAV definition model (`eav_attributes`) |
+| `EavValue` | Stored value row (`eav_values`) |
+
+---
+
+## Related HMsoft features
+
+- **Translations** — same pattern for attribute/option labels
+- **DynamicFilters** — `eav.{code}` filter keys
+- **Active / SortNumber** — attribute definition management
+- **Audit** — optional auditing on attribute definitions

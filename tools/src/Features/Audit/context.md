@@ -1,5 +1,7 @@
 # Zero-Trust Security Audit Ledger
 
+> **Note:** This file is legacy context. For the full developer reference, see [README.md](./README.md) and the [docs/](./docs/) folder.
+
 ## Overview
 
 The Security Audit module is an enterprise-grade, cryptographically verifiable logging system designed for the Syrian Precious Metals Authority (PMA). It adheres to a strict Zero-Trust architecture.

@@ -13,7 +13,7 @@ class GetListAction
         return AutoFilterAndSortService::dynamicSearchFromRequest(
             model: Attribute::class,
             extraOperation: function (Builder &$query) use ($scope) {
-                $query->where('scope', $scope)->with(Attribute::DEFAULT_INCLUDES);
+                $query->where('entity_type', $scope)->with(Attribute::DEFAULT_INCLUDES);
             },
         );
     }

@@ -6,17 +6,17 @@ use HMsoft\Tools\Features\Attribute\Support\EavConfig;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
-class AttributeOptionTranslation extends Model
+class EavValueTranslation extends Model
 {
     protected $guarded = ['id'];
 
     public function getTable()
     {
-        return EavConfig::table('attribute_option_translations') ?: 'eav_attribute_option_translations';
+        return EavConfig::table('value_translations') ?: 'eav_value_translations';
     }
 
-    public function option(): BelongsTo
+    public function value(): BelongsTo
     {
-        return $this->belongsTo(AttributeOption::class, 'attribute_option_id');
+        return $this->belongsTo(EavValue::class, 'value_id');
     }
 }

@@ -2,31 +2,33 @@
 
 namespace HMsoft\Tools\Features\Attribute\Models;
 
-use HMsoft\Tools\Features\Active\Contracts\Activable;
-use HMsoft\Tools\Features\Active\Traits\HasActiveScope;
 use HMsoft\Tools\Features\Attribute\Support\EavConfig;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\MorphTo;
 
-class AttributeOption extends Model implements Activable
+class EavValue extends Model
 {
-    use HasActiveScope;
-
     protected $guarded = ['id'];
 
     protected function casts(): array
     {
         return [
-            'is_active'  => 'boolean',
-            'is_default' => 'boolean',
-            'sort_number' => 'integer',
+            'value_number'  => 'decimal:6',
+            'value_boolean' => 'boolean',
+            'value_date'    => 'date',
         ];
     }
 
     public function getTable()
     {
-        return EavConfig::table('attribute_options') ?: 'eav_attribute_options';
+        return EavConfig::table('values') ?: 'eav_values';
+    }
+
+    public function valuable(): MorphTo
+    {
+        return $this->morphTo();
     }
 
     public function attribute(): BelongsTo
@@ -36,12 +38,17 @@ class AttributeOption extends Model implements Activable
 
     public function translations(): HasMany
     {
-        return $this->hasMany(AttributeOptionTranslation::class, 'attribute_option_id');
+        return $this->hasMany(EavValueTranslation::class, 'value_id');
     }
 
     public function translation()
     {
-        return $this->hasOne(AttributeOptionTranslation::class, 'attribute_option_id')
+        return $this->hasOne(EavValueTranslation::class, 'value_id')
             ->where('locale', app()->getLocale());
+    }
+
+    public function selectedOptions(): HasMany
+    {
+        return $this->hasMany(EavValueOption::class, 'value_id');
     }
 }

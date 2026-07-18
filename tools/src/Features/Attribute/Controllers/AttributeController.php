@@ -23,6 +23,25 @@ class AttributeController
         return CmsResponse::success(data: $result['data'], pagination: $result['pagination']);
     }
 
+    /**
+     * Get attribute definitions with resolved values for a specific object.
+     *
+     * GET /api/{scope}/{valuable}/attributes
+     */
+    public function forObject(Request $request, string $scope, int|string $valuable)
+    {
+        $entityType = Str::singular($scope);
+
+        $data = $this->attributeService->forObject(
+            entityType: $entityType,
+            valuableId: $valuable,
+            categoryType: $request->query('category_type'),
+            categoryId: $request->filled('category_id') ? (int) $request->query('category_id') : null,
+        );
+
+        return CmsResponse::success(data: AttributeData::filterableCollect($data));
+    }
+
     public function show(string $scope, Attribute $attribute)
     {
         $this->verifyScope($scope, $attribute);
@@ -81,7 +100,7 @@ class AttributeController
 
     public function bulkDelete(Request $request, string $scope)
     {
-        $request->validate(['ids' => 'required|array', 'ids.*' => 'integer|exists:attributes,id']);
+        $request->validate(['ids' => 'required|array', 'ids.*' => 'integer|exists:eav_attributes,id']);
         $this->attributeService->deleteBulk($request->ids);
         return CmsResponse::success(message: __('cms_attribute::messages.deleted_successfully'));
     }
@@ -89,8 +108,8 @@ class AttributeController
     private function verifyScope(string $scope, Attribute $attribute)
     {
         $cleanScope = Str::singular($scope);
-        if ($attribute->scope !== $cleanScope) {
-            abort(404, 'Attribute does not belong to this scope.');
+        if ($attribute->entity_type !== $cleanScope) {
+            abort(404, 'Attribute does not belong to this entity type.');
         }
     }
 }
