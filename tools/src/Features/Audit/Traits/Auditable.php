@@ -4,6 +4,7 @@ namespace HMsoft\Tools\Features\Audit\Traits;
 
 use HMsoft\Tools\Features\Audit\Jobs\ProcessAuditLogJob;
 use HMsoft\Tools\Features\Audit\Support\AuditConfig;
+use HMsoft\Tools\Features\Audit\Support\AuditValueNormalizer;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Request;
 
@@ -16,18 +17,23 @@ trait Auditable
         }
 
         static::created(function (Model $model) {
-            self::dispatchAudit($model, 'created', [], $model->toArray());
+            self::dispatchAudit($model, 'created', [], AuditValueNormalizer::normalize($model->getAttributes()));
         });
 
         static::updated(function (Model $model) {
             $changes = $model->getChanges();
             $original = array_intersect_key($model->getOriginal(), $changes);
 
-            self::dispatchAudit($model, 'updated', $original, $changes);
+            self::dispatchAudit(
+                $model,
+                'updated',
+                AuditValueNormalizer::normalize($original),
+                AuditValueNormalizer::normalize($changes),
+            );
         });
 
         static::deleted(function (Model $model) {
-            self::dispatchAudit($model, 'deleted', $model->toArray(), []);
+            self::dispatchAudit($model, 'deleted', AuditValueNormalizer::normalize($model->getAttributes()), []);
         });
     }
 

@@ -3,6 +3,7 @@
 namespace HMsoft\Tools\Features\Audit\Data;
 
 use HMsoft\Tools\Features\Audit\Models\AuditLog;
+use HMsoft\Tools\Features\DateTime\Support\CmsDateTime;
 use HMsoft\Tools\Features\DynamicFilters\Data\BaseData;
 
 class AuditLogData extends BaseData
@@ -43,14 +44,14 @@ class AuditLogData extends BaseData
             event: $log->event,
             auditable_type: $log->auditable_type,
             auditable_id: (string) $log->auditable_id, // Cast to string in case it is a UUID
-            old_values: $log->old_values,
-            new_values: $log->new_values,
+            old_values: CmsDateTime::transformArray($log->old_values),
+            new_values: CmsDateTime::transformArray($log->new_values),
             ip_address: $log->ip_address,
             user_agent: $log->user_agent,
             session_id: $log->session_id,
             previous_hash: $log->previous_hash,
             hash: $log->hash,
-            created_at: $log->created_at?->toDateTimeString(),
+            created_at: CmsDateTime::toApi($log->created_at),
             actor: $actor,
         );
     }

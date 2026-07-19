@@ -320,4 +320,16 @@ abstract class BaseData extends Data
 
         return self::$rawFieldsCache[$className][$propertyName] = true;
     }
+
+    /**
+     * Format a datetime for API output (storage UTC → resolved API timezone).
+     */
+    protected static function formatApiDate(mixed $value): ?string
+    {
+        if (! class_exists(\HMsoft\Tools\Features\DateTime\Support\CmsDateTime::class)) {
+            return $value instanceof \DateTimeInterface ? $value->format(DATE_ATOM) : (is_string($value) ? $value : null);
+        }
+
+        return \HMsoft\Tools\Features\DateTime\Support\CmsDateTime::toApi($value);
+    }
 }
