@@ -79,14 +79,31 @@ trait HandlesSingleMedia
         $isDeleted = false;
 
         if (Schema::hasColumn($model->getTable(), $field)) {
-            if ($model->{$field}) {
-                MediaUploader::deleteFile($model->{$field}, $disk);
+            $currentValue = $model->{$field};
+
+            if ($currentValue) {
+                // التحقق مما إذا كانت القيمة مساراً محلياً أم رابطاً خارجياً (URL)
+                $isUrl = filter_var($currentValue, FILTER_VALIDATE_URL);
+
+                // حذف الملف فعلياً من القرص فقط إذا لم يكن رابطاً خارجياً
+                if (!$isUrl) {
+                    try {
+                        MediaUploader::deleteFile($currentValue, $disk);
+                    } catch (\Exception $e) {
+                        // تسجيل الخطأ إن لزم الأمر حتى لا يتوقف النظام إذا كان الملف مفقوداً
+                        // \Log::warning("Failed to delete media file: " . $e->getMessage());
+                    }
+                }
+
+                // إفراغ الحقل في قاعدة البيانات في جميع الحالات (URL أو مسار محلي)
                 $model->update([$field => null]);
                 $isDeleted = true;
             }
         } else {
             $media = $model->mediaList()->where('media_type', $field)->first();
             if ($media) {
+                // إذا كان جدول الميديا الخارجي يدعم الروابط، يجب التأكد أن دالة الحذف داخله
+                // تتعامل مع الروابط بشكل جيد أيضاً.
                 app(MediaService::class)->delete($model, $media);
                 $isDeleted = true;
             }
@@ -94,4 +111,25 @@ trait HandlesSingleMedia
 
         return $isDeleted ? 'deleted' : 'unchanged';
     }
+    // protected function deleteSingleImage(Model $model, string $field = 'image', ?string $disk = null): string
+    // {
+    //     $disk = $disk ?? (method_exists($model, 'getMediaDisk') ? $model->getMediaDisk() : config('cms_media.default_disk', 'public'));
+    //     $isDeleted = false;
+
+    //     if (Schema::hasColumn($model->getTable(), $field)) {
+    //         if ($model->{$field}) {
+    //             MediaUploader::deleteFile($model->{$field}, $disk);
+    //             $model->update([$field => null]);
+    //             $isDeleted = true;
+    //         }
+    //     } else {
+    //         $media = $model->mediaList()->where('media_type', $field)->first();
+    //         if ($media) {
+    //             app(MediaService::class)->delete($model, $media);
+    //             $isDeleted = true;
+    //         }
+    //     }
+
+    //     return $isDeleted ? 'deleted' : 'unchanged';
+    // }
 }

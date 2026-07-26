@@ -1,19 +1,21 @@
 # Active Feature
 
-The Active feature provides a clean, plug-and-play implementation for managing activation statuses (e.g., `is_active`) in your Eloquent models. It automatically applies a global scope to filter active records and provides local scopes for manual querying.
+Automatic Eloquent filtering for active/inactive records (`is_active` by default), with an extension point for extra visibility rules.
 
-## 📂 Directory Structure
+## Directory structure
 
 ```text
 HMsoft/Tools/Features/Active/
 ├── Contracts/
-│   └── Activable.php
-└── Traits/
-    └── HasActiveScope.php
+│   └── Activable.php          # Model contract
+├── Traits/
+│   └── HasActiveScope.php     # Global scope + local scopes
+└── README.md
 ```
 
-🚀 Installation & Usage
-To implement the Active feature, your model must implement the Activable contract and use the HasActiveScope trait.
+## Installation & usage
+
+Your model must implement `Activable` and use `HasActiveScope`:
 
 ```php
 namespace App\Models;
@@ -24,61 +26,126 @@ use HMsoft\Tools\Features\Active\Traits\HasActiveScope;
 
 class Article extends Model implements Activable
 {
-use HasActiveScope;
+    use HasActiveScope;
 
     protected $fillable = ['title', 'is_active'];
-
 }
-
 ```
 
-By default, the trait assumes your database column is named is_active.
+By default the active column is `is_active`.
 
-⚙️ Customization
-Changing the Column Name
-If your database column has a different name (e.g., status), you can override the default by defining a constant in your model:
+## How the global scope works
+
+When the scope runs (typically for public/guest users):
+
+```text
+SELECT * FROM articles
+WHERE articles.is_active = 1
+  -- plus anything you add in extraActiveCondition()
+```
+
+Steps inside `HasActiveScope`:
+
+| Step | What happens |
+|------|----------------|
+| 1 | `shouldApplyActiveScope()` → skip entirely if `false` |
+| 2 | Optional `resolveActiveScopeCondition()` on the model (app-level, e.g. admin bypass) |
+| 3 | `WHERE {active_column} = {active_value}` (default: `is_active = 1`) |
+| 4 | `extraActiveCondition($builder)` — your custom rules |
+
+## Customization
+
+### Change the column name
+
+Define a constant:
 
 ```php
 class Article extends Model implements Activable
 {
     use HasActiveScope;
 
-    const ACTIVE_COLUMN = 'status';
+    public const ACTIVE_COLUMN = 'status';
 }
 ```
 
-Alternatively, you can override the getActiveColumnName() method:
+Or override `getActiveColumnName()`.
+
+### Non-boolean active column (e.g. status enum)
 
 ```php
 public function getActiveColumnName(): string
 {
-return 'custom_active_column';
+    return 'status';
+}
+
+public function getActiveColumnValue(): mixed
+{
+    return NewsStatusEnum::PUBLISHED->value;
 }
 ```
 
-Disabling the Global Scope Dynamically
-You can control whether the global scope should be applied by overriding the shouldApplyActiveScope() method in your model or globally setting a callable:
+### Disable scope for admins
+
+**Per model** — override `shouldApplyActiveScope()`:
 
 ```php
 public function shouldApplyActiveScope(): bool
 {
-    // Example: Disable scope for admins
     return ! auth()->user()?->isAdmin();
 }
 ```
 
-🛠️ Available Scopes
-The trait provides local scopes to easily retrieve records regardless of the global scope.
+**App-wide** — set a callable on the trait:
 
 ```php
-active(): Retrieves only active records.
+HasActiveScope::$applyScopeCondition = fn () => ! auth()->user()?->isAdmin();
 ```
+
+**Per request** — add `resolveActiveScopeCondition()` on the model (common pattern in this project via `ApplyActiveScopeForNotAdmin`).
+
+### Extra active conditions (`extraActiveCondition`)
+
+Add any query constraint on top of `is_active`. Runs in both the global scope and `active()` local scope.
+
+```php
+use Illuminate\Database\Eloquent\Builder;
+
+protected function extraActiveCondition(Builder $builder): void
+{
+    // Example: must belong to an active category
+    $builder->whereHas('category');
+
+    // Example: only published
+    // $builder->where('published_at', '<=', now());
+}
+```
+
+Keep HMsoft generic — put reusable helpers (e.g. hierarchical categories) in your application layer and call them from `extraActiveCondition()`.
+
+## Local scopes
+
+| Scope | Behaviour |
+|-------|-----------|
+| `active()` | `is_active = 1` **+** `extraActiveCondition()` |
+| `inactive()` | `is_active = 0` only (no extras) |
+
+When the global scope is disabled:
 
 ```php
 Article::withoutGlobalScope('active_scope')->active()->get();
-inactive(): Retrieves only inactive records.
-```
-
-```php
 Article::withoutGlobalScope('active_scope')->inactive()->get();
 ```
+
+## Activable contract
+
+| Method | Purpose | Default in trait |
+|--------|---------|------------------|
+| `getActiveColumnName(): string` | Active flag column | `'is_active'` |
+| `shouldApplyActiveScope(): bool` | Run global scope? | `true` |
+
+See `Contracts/Activable.php` for full PHPDoc.
+
+## Related files in this project
+
+- `App\Traits\ApplyActiveScopeForNotAdmin` — sets `resolveActiveScopeCondition()` so admins bypass the scope.
+- `App\Support\ActiveScopeConstraints` — optional helpers for category trees (called from `extraActiveCondition()`).
