@@ -7,10 +7,13 @@ use HMsoft\Tools\Features\Active\Traits\HasActiveScope;
 use HMsoft\Tools\Features\Attribute\Enums\InputTypeEnum;
 use HMsoft\Tools\Features\Attribute\Enums\ValueTypeEnum;
 use HMsoft\Tools\Features\Attribute\Support\EavConfig;
+use HMsoft\Tools\Features\Audit\Traits\HasDynamicSyncAndAudit;
 use HMsoft\Tools\Features\DynamicFilters\Contracts\AutoFilterable;
 use HMsoft\Tools\Features\DynamicFilters\Traits\IsAutoFilterable;
 use HMsoft\Tools\Features\SortNumber\Contracts\Sortable;
 use HMsoft\Tools\Features\SortNumber\Traits\HasSortNumber;
+use HMsoft\Tools\Features\Media\Traits\HasMedia;
+use HMsoft\Tools\Features\Translations\Traits\HasTranslations;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -18,12 +21,26 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 
 class Attribute extends Model implements AutoFilterable, Activable, Sortable
 {
-    use IsAutoFilterable, HasActiveScope, HasSortNumber, SoftDeletes;
+    use IsAutoFilterable,
+        HasActiveScope,
+        HasSortNumber,
+        HasDynamicSyncAndAudit,
+        SoftDeletes,
+        HasMedia,
+        HasTranslations;
 
     protected $table = 'eav_attributes';
     protected $guarded = ['id'];
 
-    public const DEFAULT_INCLUDES = ['translations', 'options.translations', 'categories'];
+    public const DEFAULT_INCLUDES = [
+        'translations',
+        'options.translations',
+        'categories.category'
+    ];
+    public const MEDIA_FOLDER = 'attributes';
+
+    protected array $cmsMediaFields = ['icon'];
+    public string $cmsMediaSet = 'attributes';
 
     protected function casts(): array
     {
@@ -39,6 +56,11 @@ class Attribute extends Model implements AutoFilterable, Activable, Sortable
             'is_sortable'   => 'boolean',
             'is_searchable' => 'boolean',
         ];
+    }
+
+    public function getTranslationRelationKey(): string
+    {
+        return "attribute_id";
     }
 
     public function getTable()
@@ -87,7 +109,6 @@ class Attribute extends Model implements AutoFilterable, Activable, Sortable
         return 'eav_attribute';
     }
 
-    /** @deprecated Use entity_type */
     public function getScopeAttribute(): ?string
     {
         return $this->entity_type;

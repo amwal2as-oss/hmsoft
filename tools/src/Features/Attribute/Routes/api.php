@@ -14,5 +14,5 @@ Route::prefix('{scope}/attributes')->controller(AttributeController::class)->gro
     Route::get('/{attribute}', 'show');
     Route::post('/{attribute}', 'update');
     Route::delete('/{attribute}', 'destroy');
-    Route::post('/{attribute}/image', 'updateImage');
+    Route::post('/{attribute}/icon', 'updateIcon');
 });

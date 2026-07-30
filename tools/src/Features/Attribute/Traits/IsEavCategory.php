@@ -8,7 +8,20 @@ use Illuminate\Database\Eloquent\Relations\MorphToMany;
 trait IsEavCategory
 {
     /**
-     * جلب السمات (EAV Attributes) المرتبطة بهذا التصنيف.
+     * التنظيف التلقائي: يتم استدعاؤه بمجرد حذف أي فئة تستخدم هذا الـ Trait
+     */
+    public static function bootIsEavCategory(): void
+    {
+        static::deleting(function ($model) {
+            // حذف جميع الروابط من جدول eav_attribute_categories عند حذف الفئة
+            if (method_exists($model, 'eavAttributes')) {
+                $model->eavAttributes()->detach();
+            }
+        });
+    }
+
+    /**
+     * (EAV Attributes)
      *
      * @return MorphToMany
      */
@@ -16,10 +29,18 @@ trait IsEavCategory
     {
         return $this->morphToMany(
             Attribute::class,
-            'category', // يعكس الحقول: category_type و category_id في الجدول الوسيط
+            'category', // category_type, category_id
             'eav_attribute_categories',
             'category_id',
             'attribute_id'
         );
+    }
+
+    /**
+     * الدالة المسؤولة عن تقديم الكائن لحزمة الـ EAV.
+     */
+    public function toEavResourceArray(): array
+    {
+        return $this->toArray();
     }
 }

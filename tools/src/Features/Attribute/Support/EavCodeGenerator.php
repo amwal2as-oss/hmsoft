@@ -8,7 +8,7 @@ use Illuminate\Support\Str;
 class EavCodeGenerator
 {
     /**
-     * Resolve attribute code. When omitted, generates a unique slug from the first locale title.
+     * Resolve attribute code. Uses provided code or generates a generic unique one (e.g., attr_1).
      */
     public static function forAttribute(?string $code, string $entityType, array $locales, ?int $ignoreId = null): ?string
     {
@@ -16,16 +16,12 @@ class EavCodeGenerator
             return self::normalize($code);
         }
 
-        $title = collect($locales)->first()['title'] ?? null;
-        if (! $title) {
-            return null;
-        }
-
-        return self::uniqueForEntity(self::normalize($title) ?: 'attribute', $entityType, $ignoreId);
+        // Generate a unique code strictly using the fallback prefix
+        return self::uniqueForEntity('attr', $entityType, $ignoreId);
     }
 
     /**
-     * Resolve option code. Optional — returns null when omitted.
+     * Resolve option code. Uses provided code or generates a generic unique one (e.g., opt_a1b2c).
      */
     public static function forOption(?string $code, array $locales): ?string
     {
@@ -33,11 +29,8 @@ class EavCodeGenerator
             return self::normalize($code);
         }
 
-        $label = collect($locales)->first()['label']
-            ?? collect($locales)->first()['title']
-            ?? null;
-
-        return $label ? (self::normalize($label) ?: null) : null;
+        // Generate a random code strictly using the fallback prefix for options
+        return 'opt_' . strtolower(Str::random(5));
     }
 
     public static function normalize(string $value): string
@@ -63,7 +56,7 @@ class EavCodeGenerator
         return Attribute::query()
             ->where('entity_type', $entityType)
             ->where('code', $code)
-            ->when($ignoreId, fn ($q) => $q->where('id', '!=', $ignoreId))
+            ->when($ignoreId, fn($q) => $q->where('id', '!=', $ignoreId))
             ->exists();
     }
 }

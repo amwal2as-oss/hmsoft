@@ -38,4 +38,13 @@ return [
         'value_translations' => 'eav_value_translations',
         'value_options' => 'eav_value_options',
     ],
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | Category Morph Map (Config-Driven Mapping)
+    |--------------------------------------------------------------------------
+    | Map the entity_type to its corresponding category morph class.
+    */
+    'category_map' => [],
 ];

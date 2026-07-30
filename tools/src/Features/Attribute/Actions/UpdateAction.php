@@ -2,45 +2,63 @@
 
 namespace HMsoft\Tools\Features\Attribute\Actions;
 
-use HMsoft\Tools\Features\Attribute\Data\SyncAttributeImageData;
+use HMsoft\Tools\Features\Attribute\Data\SyncAttributeIconData;
 use HMsoft\Tools\Features\Attribute\Data\UpdateAttributeData;
+use HMsoft\Tools\Features\Attribute\Enums\InputTypeEnum;
 use HMsoft\Tools\Features\Attribute\Models\Attribute;
+use HMsoft\Tools\Features\Attribute\Services\EavFilterRegistrar;
 use Illuminate\Support\Facades\DB;
 use Spatie\LaravelData\Optional;
 
 class UpdateAction
 {
-    public function __construct(private readonly SyncImageAction $syncImageAction) {}
+    public function __construct(private readonly SyncIconAction $SyncIconAction) {}
 
     public function execute(Attribute $attribute, UpdateAttributeData $data): Attribute
     {
         return DB::transaction(function () use ($attribute, $data) {
             $updateData = collect($data->toArray())
-                ->except(['locales', 'options', 'id', 'image', 'delete_image'])
+                ->except(['locales', 'options', 'categories', 'id', 'icon', 'delete_icon', 'scope'])
                 ->reject(fn($value) => $value instanceof Optional)
                 ->toArray();
 
-            if (isset($updateData['type'])) {
-                $updateData['cast_type'] = match ($updateData['type']) {
-                    'checkbox' => 'json',
-                    'select', 'radio', 'number' => 'integer',
-                    'boolean' => 'boolean',
-                    default => 'string',
-                };
+            // Set the correct value_type based on input_type
+            if (isset($updateData['input_type'])) {
+                $inputTypeEnum = InputTypeEnum::tryFrom($updateData['input_type']);
+                if ($inputTypeEnum) {
+                    $updateData['value_type'] = $inputTypeEnum->valueType();
+                }
             }
 
             if (!empty($updateData)) {
                 $attribute->update($updateData);
             }
 
+            // Sync Translations
             $locales = $data->locales instanceof Optional ? null : $data->locales;
             if ($locales !== null && method_exists($attribute, 'syncTranslations')) {
                 $attribute->syncTranslations($attribute, $locales);
             }
 
+            // Sync Categories
+            $categoriesData = $data->categories instanceof Optional ? null : $data->categories;
+            if ($categoriesData !== null) {
+                $attribute->categories()->delete();
+                foreach ($categoriesData as $category) {
+                    $attribute->categories()->create([
+                        'category_type' => $category['category_type'],
+                        'category_id'   => $category['category_id'],
+                    ]);
+                }
+            }
+
+            // Sync Options
             $optionsData = $data->options instanceof Optional ? null : $data->options;
-            if ($optionsData !== null && in_array($attribute->type, ['select', 'radio', 'checkbox'])) {
+            $currentInputType = isset($updateData['input_type']) ? $updateData['input_type'] : ($attribute->input_type->value ?? $attribute->input_type);
+            
+            if ($optionsData !== null && in_array($currentInputType, ['select', 'radio', 'checkbox', 'multi_select'])) {
                 $keepOptionIds = [];
+
                 foreach ($optionsData as $optData) {
                     $optArray = is_array($optData) ? $optData : $optData->toArray();
 
@@ -57,18 +75,25 @@ class UpdateAction
                         $option->syncTranslations($option, $optArray['locales']);
                     }
                 }
+
                 $attribute->options()->whereNotIn('id', $keepOptionIds)->delete();
-            } elseif (isset($updateData['type']) && !in_array($updateData['type'], ['select', 'radio', 'checkbox'])) {
+            } elseif (isset($updateData['input_type']) && !in_array($updateData['input_type'], ['select', 'radio', 'checkbox', 'multi_select'])) {
                 $attribute->options()->delete();
             }
 
-            $imageFile = $data->image instanceof Optional ? null : $data->image;
-            $shouldDelete = $data->delete_image instanceof Optional ? false : (bool)$data->delete_image;
-            $syncImageData = SyncAttributeImageData::from([
-                'image' => $imageFile,
-                'delete_image' => $shouldDelete
+            // Sync Icon
+            $iconFile = $data->icon instanceof Optional ? null : $data->icon;
+            $shouldDelete = $data->delete_icon instanceof Optional ? false : (bool)$data->delete_icon;
+
+            if ($iconFile !== null || $shouldDelete) {
+            $syncIconData = SyncAttributeIconData::from([
+                'icon' => $iconFile,
+                'delete_icon' => $shouldDelete
             ]);
-            $this->syncImageAction->execute($attribute, $syncImageData);
+            $this->SyncIconAction->execute($attribute, $syncIconData);
+            }
+
+            EavFilterRegistrar::flushEntityCache($attribute->entity_type);
 
             return $attribute->refresh()->load(Attribute::DEFAULT_INCLUDES);
         });

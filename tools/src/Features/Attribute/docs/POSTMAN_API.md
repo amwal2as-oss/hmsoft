@@ -669,10 +669,10 @@ DELETE {{base_url}}/api/{{scope}}/attributes/bulk-delete
 
 ---
 
-## 8. Update attribute icon/image (legacy)
+## 8. Update attribute icon/icon (legacy)
 
 ```http
-POST {{base_url}}/api/{{scope}}/attributes/{{attribute_id}}/image
+POST {{base_url}}/api/{{scope}}/attributes/{{attribute_id}}/icon
 Content-Type: multipart/form-data
 ```
 
@@ -681,8 +681,8 @@ Content-Type: multipart/form-data
 | Key | Type | Value |
 |-----|------|-------|
 | `icon` | text | `scale` |
-| `image` | file | *(optional file upload — legacy)* |
-| `delete_image` | boolean | `false` |
+| `icon` | file | *(optional file upload — legacy)* |
+| `delete_icon` | boolean | `false` |
 
 > Prefer setting `icon` string on create/update JSON body instead of this endpoint.
 
@@ -690,7 +690,7 @@ Content-Type: multipart/form-data
 
 ```json
 {
-  "message": "Image uploaded successfully",
+  "message": "Icon uploaded successfully",
   "data": {
     "id": 1,
     "code": "weight",

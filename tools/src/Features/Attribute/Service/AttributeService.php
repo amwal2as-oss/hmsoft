@@ -2,8 +2,8 @@
 
 namespace HMsoft\Tools\Features\Attribute\Service;
 
-use HMsoft\Tools\Features\Attribute\Actions\{CreateAction, DeleteAction, GetListAction, GetObjectAttributesAction, SyncImageAction, UpdateAction, UpdateBulkAction};
-use HMsoft\Tools\Features\Attribute\Data\{AttributeData, StoreAttributeData, SyncAttributeImageData, UpdateAllAttributesData, UpdateAttributeData};
+use HMsoft\Tools\Features\Attribute\Actions\{CreateAction, DeleteAction, GetListAction, GetObjectAttributesAction, SyncIconAction, UpdateAction, UpdateBulkAction};
+use HMsoft\Tools\Features\Attribute\Data\{AttributeData, StoreAttributeData, SyncAttributeIconData, UpdateAllAttributesData, UpdateAttributeData};
 use HMsoft\Tools\Features\Attribute\Models\Attribute;
 
 class AttributeService
@@ -15,7 +15,7 @@ class AttributeService
         private readonly DeleteAction $delete_action,
         private readonly GetListAction $get_list_action,
         private readonly GetObjectAttributesAction $get_object_attributes_action,
-        private readonly SyncImageAction $sync_image_action
+        private readonly SyncIconAction $sync_icon_action
     ) {}
 
     public function list(string $scope): array
@@ -54,9 +54,9 @@ class AttributeService
         return $this->update_bulk_action->execute($data);
     }
 
-    public function syncImage(Attribute $model, SyncAttributeImageData $data): array
+    public function syncIcon(Attribute $model, SyncAttributeIconData $data): array
     {
-        return $this->sync_image_action->execute($model, $data);
+        return $this->sync_icon_action->execute($model, $data);
     }
 
     public function show(Attribute $model): Attribute

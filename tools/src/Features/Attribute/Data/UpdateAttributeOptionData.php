@@ -17,12 +17,12 @@ class UpdateAttributeOptionData extends Data
     public static function rules(): array
     {
         return [
-            'id'                 => ['sometimes', 'nullable', 'integer', 'exists:attribute_options,id'],
+            'id'                 => ['sometimes', 'nullable', 'integer', 'exists:eav_attribute_options,id'],
             'is_active'          => ['sometimes', 'boolean'],
             'sort_number'        => ['sometimes', 'integer'],
             'locales'            => ['required', 'array', 'min:1'],
             'locales.*.locale'   => ['required', 'string'],
-            'locales.*.title'    => ['required', 'string', 'max:255'],
+            'locales.*.label'    => ['required', 'string', 'max:255'], // تم الاعتماد على label فقط
         ];
     }
 }

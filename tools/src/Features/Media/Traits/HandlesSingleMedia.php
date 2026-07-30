@@ -21,10 +21,12 @@ trait HandlesSingleMedia
         ?string $disk = null
     ): string {
 
+
         if ($file) {
             $deleteImage = false;
         }
 
+        
         if ($deleteImage) {
             return $this->deleteSingleImage($model, $field, $disk);
         }

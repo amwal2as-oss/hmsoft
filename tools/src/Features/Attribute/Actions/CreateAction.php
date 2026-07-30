@@ -19,7 +19,6 @@ class CreateAction
     {
         return DB::transaction(function () use ($data) {
             $inputType = InputTypeEnum::from($data->input_type);
-
             $code = EavCodeGenerator::forAttribute($data->code, $data->entity_type, $data->locales);
 
             $attribute = Attribute::create([
@@ -62,8 +61,8 @@ class CreateAction
                     foreach ($optionData->locales as $localeRow) {
                         AttributeOptionTranslation::create([
                             'attribute_option_id' => $option->id,
-                            'locale'                => $localeRow['locale'],
-                            'label'                 => $localeRow['label'] ?? $localeRow['title'] ?? '',
+                            'locale'              => $localeRow['locale'],
+                            'label'               => $localeRow['label'], // تخزين label بشكل مباشر
                         ]);
                     }
                 }

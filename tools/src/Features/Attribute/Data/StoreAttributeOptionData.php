@@ -27,8 +27,7 @@ class StoreAttributeOptionData extends Data
             'sort_number'        => ['sometimes', 'integer'],
             'locales'            => ['required', 'array', 'min:1'],
             'locales.*.locale'   => ['required', 'string'],
-            'locales.*.label'    => ['required_without:locales.*.title', 'string', 'max:255'],
-            'locales.*.title'    => ['required_without:locales.*.label', 'string', 'max:255'],
+            'locales.*.label'    => ['required', 'string', 'max:255'], // تم الاعتماد على label فقط
         ];
     }
 
@@ -39,7 +38,6 @@ class StoreAttributeOptionData extends Data
                 $properties[$field] = filter_var($properties[$field], FILTER_VALIDATE_BOOLEAN);
             }
         }
-
         return $properties;
     }
 }

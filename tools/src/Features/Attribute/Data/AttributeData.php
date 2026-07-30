@@ -20,7 +20,8 @@ class AttributeData extends BaseData
         public readonly ?string $value_type,
         public readonly ?array $default_value,
         public readonly ?array $validation_rules,
-        public readonly ?string $icon,
+        public readonly Lazy|array|null $icon,
+        public readonly ?string $icon_url,
         public readonly ?bool $is_active,
         public readonly ?bool $is_filterable,
         public readonly ?bool $is_sortable,
@@ -30,19 +31,12 @@ class AttributeData extends BaseData
         public readonly ?string $title,
         public readonly array|Optional $translations,
         public readonly array|Optional $categories,
-
         #[DataCollectionOf(AttributeOptionData::class)]
         public readonly DataCollection|array|Optional $options,
-
-        /** @deprecated use entity_type */
         public readonly ?string $scope = null,
-        /** @deprecated use input_type */
         public readonly ?string $type = null,
-
         public readonly ?\DateTime $created_at = null,
         public readonly ?\DateTime $updated_at = null,
-
-        /** Resolved value for a specific object (when loaded via forObject endpoint) */
         public readonly mixed $value = null,
         public readonly ?int $value_id = null,
     ) {}
@@ -66,7 +60,8 @@ class AttributeData extends BaseData
             value_type: $valueType,
             default_value: $attribute->default_value,
             validation_rules: $attribute->validation_rules,
-            icon: $attribute->icon,
+            icon: $attribute->getMediaObject('icon'),
+            icon_url: $attribute->icon_url,
             is_active: $attribute->is_active,
             is_filterable: $attribute->is_filterable,
             is_sortable: $attribute->is_sortable,
@@ -75,7 +70,7 @@ class AttributeData extends BaseData
             sort_number: $attribute->sort_number,
             title: $defaultTranslation?->title,
             translations: $attribute->relationLoaded('translations')
-                ? $attribute->translations->mapWithKeys(fn ($t) => [
+                ? $attribute->translations->mapWithKeys(fn($t) => [
                     $t->locale => [
                         'title' => $t->title,
                         'placeholder' => $t->placeholder,
@@ -83,12 +78,34 @@ class AttributeData extends BaseData
                     ],
                 ])->toArray()
                 : Optional::create(),
+
+            // --- الاستدعاء الذكي للفئات (Polymorphism) ---
             categories: $attribute->relationLoaded('categories')
-                ? $attribute->categories->map(fn ($c) => [
-                    'category_type' => $c->category_type,
-                    'category_id' => $c->category_id,
-                ])->values()->all()
+                ? $attribute->categories->map(function ($c) {
+
+                    // 1. فرض تحميل العلاقة إذا فُقدت بسبب الـ Refresh
+                    if (! $c->relationLoaded('category')) {
+                        $c->load('category');
+                    }
+
+                    // 2. إذا تم العثور على الفئة في قاعدة البيانات
+                    if ($c->category) {
+                        if (method_exists($c->category, 'toEavResourceArray')) {
+                            return $c->category->toEavResourceArray();
+                        }
+                        return $c->category->toArray();
+                    }
+
+                    // 3. مسار الحماية (يُنفذ فقط إذا كان المودل null)
+                    return [
+                        'id' => $c->category_id,
+                        'category_type' => $c->category_type,
+                        '_error' => 'Category not found in DB, or hidden by Global Scope (is_active=false), or MorphMap missing.'
+                    ];
+                })->values()->all()
                 : Optional::create(),
+            // ----------------------------------------
+
             options: $attribute->relationLoaded('options')
                 ? AttributeOptionData::collect($attribute->options, DataCollection::class)
                 : Optional::create(),
@@ -111,7 +128,8 @@ class AttributeData extends BaseData
             value_type: $base->value_type,
             default_value: $base->default_value,
             validation_rules: $base->validation_rules,
-            icon: $base->icon,
+            icon: $attribute->getMediaObject('icon'),
+            icon_url: $attribute->icon_url,
             is_active: $base->is_active,
             is_filterable: $base->is_filterable,
             is_sortable: $base->is_sortable,
@@ -131,13 +149,10 @@ class AttributeData extends BaseData
         );
     }
 
-    /**
-     * @param  iterable<int, array{attribute: Attribute, value: ?EavValue, presented_value: mixed}>  $rows
-     */
     public static function collectWithValues(iterable $rows): array
     {
         return collect($rows)
-            ->map(fn (array $row) => self::fromModelWithValue(
+            ->map(fn(array $row) => self::fromModelWithValue(
                 $row['attribute'],
                 $row['value'],
                 $row['presented_value'] ?? null,

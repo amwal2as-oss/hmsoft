@@ -5,13 +5,17 @@ namespace HMsoft\Tools\Features\Attribute\Models;
 use HMsoft\Tools\Features\Active\Contracts\Activable;
 use HMsoft\Tools\Features\Active\Traits\HasActiveScope;
 use HMsoft\Tools\Features\Attribute\Support\EavConfig;
+use HMsoft\Tools\Features\Audit\Traits\HasDynamicSyncAndAudit;
+use HMsoft\Tools\Features\Translations\Traits\HasTranslations;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class AttributeOption extends Model implements Activable
 {
-    use HasActiveScope;
+    use HasActiveScope,
+        HasDynamicSyncAndAudit,
+        HasTranslations;
 
     protected $guarded = ['id'];
 
@@ -22,6 +26,11 @@ class AttributeOption extends Model implements Activable
             'is_default' => 'boolean',
             'sort_number' => 'integer',
         ];
+    }
+
+    public function getTranslationRelationKey(): string
+    {
+        return "attribute_option_id";
     }
 
     public function getTable()

@@ -2,7 +2,7 @@
 
 namespace HMsoft\Tools\Features\Attribute\Controllers;
 
-use HMsoft\Tools\Features\Attribute\Data\{AttributeData, StoreAttributeData, SyncAttributeImageData, UpdateAllAttributesData, UpdateAttributeData};
+use HMsoft\Tools\Features\Attribute\Data\{AttributeData, StoreAttributeData, SyncAttributeIconData, UpdateAllAttributesData, UpdateAttributeData};
 use HMsoft\Tools\Features\Attribute\Models\Attribute;
 use HMsoft\Tools\Features\Attribute\Service\AttributeService;
 use HMsoft\Tools\Features\Response\Facades\CmsResponse;
@@ -70,19 +70,19 @@ class AttributeController
         );
     }
 
-    public function updateImage(SyncAttributeImageData $data, string $scope, Attribute $attribute)
+    public function updateIcon(SyncAttributeIconData $data, string $scope, Attribute $attribute)
     {
         $this->verifyScope($scope, $attribute);
 
-        $result = $this->attributeService->syncImage($attribute, $data);
+        $result = $this->attributeService->syncIcon($attribute, $data);
         $mediaStatus = $result['media_status'];
 
         if ($mediaStatus === 'deleted') {
-            $message = __('cms_attribute::messages.image_deleted_successfully');
+            $message = __('cms_attribute::messages.icon_deleted_successfully');
         } elseif ($mediaStatus === 'uploaded') {
-            $message = __('cms_attribute::messages.image_uploaded_successfully');
+            $message = __('cms_attribute::messages.icon_uploaded_successfully');
         } else {
-            $message = __('cms_attribute::messages.image_unchanged');
+            $message = __('cms_attribute::messages.icon_unchanged');
         }
 
         return CmsResponse::success(

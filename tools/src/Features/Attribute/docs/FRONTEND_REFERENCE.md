@@ -51,7 +51,7 @@ All routes use `{scope}` = plural route segment (e.g. `blogs` → stored as `ent
 | POST | `/api/{scope}/attributes/updateAll` | Bulk update |
 | DELETE | `/api/{scope}/attributes/{id}` | Delete one |
 | DELETE | `/api/{scope}/attributes/bulk-delete` | Bulk delete |
-| POST | `/api/{scope}/attributes/{id}/image` | Legacy image upload (prefer `icon`) |
+| POST | `/api/{scope}/attributes/{id}/icon` | Legacy icon upload (prefer `icon`) |
 
 Full request/response examples: [POSTMAN_API.md](./POSTMAN_API.md)
 
