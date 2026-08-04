@@ -30,7 +30,7 @@ class CreateAction
 
             $sortNumber = ($owner->mediaList()->max('sort_number') ?? 0) + 1;
             $fileDetails = [];
-            $autoMediaType = 'gallery';
+            $autoMediaType = 'image';
 
             // Checks for Optional, null, or empty strings ""
             $folder = ($data->folder instanceof Optional || empty($data->folder))

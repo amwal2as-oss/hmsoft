@@ -11,7 +11,7 @@ trait HandlesMultipleMedia
     protected function syncMultipleMedia(
         Model $model,
         array $files = [],
-        string $field = 'gallery',
+        string $field = 'image',
         array $deletedIds = [],
         ?string $folder = null
     ): void {

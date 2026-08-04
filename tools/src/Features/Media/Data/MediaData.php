@@ -2,7 +2,7 @@
 
 namespace HMsoft\Tools\Features\Media\Data;
 
-use App\Data\BaseData;
+use HMsoft\Tools\Features\DynamicFilters\Data\BaseData;
 use HMsoft\Tools\Features\Media\Models\Medium;
 use Spatie\LaravelData\Optional;
 

@@ -26,7 +26,7 @@ trait InteractsWithMediaRules
         ];
     }
 
-    protected static function getGalleryRules(string $field = 'gallery'): array
+    protected static function getGalleryRules(string $field = 'image'): array
     {
         return [
             $field              => ['sometimes', 'array'],

@@ -238,10 +238,10 @@ class UpdateProductGalleryAction
     {
         $this->syncMultipleMedia(
             model: $product,
-            files: $requestData['gallery_files'] ?? [], // Array of files/URLs
-            field: 'product_gallery',
+            files: $requestData['images_files'] ?? [], // Array of files/URLs
+            field: 'product_images',
             deletedIds: $requestData['removed_image_ids'] ?? [], // Cleans up selected records from disk and DB
-            folder: 'products/gallery'
+            folder: 'products/images'
         );
     }
 }
@@ -250,7 +250,7 @@ class UpdateProductGalleryAction
 
 ### C. Direct Interaction via API Controller (Zero-Hardcoding Pipeline)
 
-Because the routes utilize a flexible, automated structure `{owner_type}/{owner_id}/media`, you can manage a product's gallery directly via dedicated API endpoints.
+Because the routes utilize a flexible, automated structure `{owner_type}/{owner_id}/media`, you can manage a product's images directly via dedicated API endpoints.
 
 #### Sample JSON Payload for Bulk Creation (`POST /api/products/45/media`)
 
