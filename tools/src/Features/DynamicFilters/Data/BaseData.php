@@ -34,6 +34,24 @@ abstract class BaseData extends Data
     protected static bool $isPruning = false;
 
     /**
+     * Serialize nested DTOs without applying the current request's fields/except query.
+     *
+     * Use when embedding child payloads (e.g. media files inside a complaint resource)
+     * so parent ?fields=id,created_at does not strip nested keys like file_url.
+     */
+    public static function withoutFieldPruning(callable $callback): mixed
+    {
+        $previous = static::$isPruning;
+        static::$isPruning = true;
+
+        try {
+            return $callback();
+        } finally {
+            static::$isPruning = $previous;
+        }
+    }
+
+    /**
      * Transform a list (array, Collection, paginator, or DataCollection) and apply field pruning.
      *
      * Typical controller usage after AutoFilterAndSortService:

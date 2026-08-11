@@ -50,4 +50,12 @@ class MediaData extends BaseData
             created_at: $medium->created_at,
         );
     }
+
+    /**
+     * Media is always embedded in a parent resource; skip request-level field pruning here.
+     */
+    public function toArray(): array
+    {
+        return static::withoutFieldPruning(fn() => parent::toArray());
+    }
 }
