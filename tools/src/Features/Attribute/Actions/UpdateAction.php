@@ -81,16 +81,20 @@ class UpdateAction
                 $attribute->options()->delete();
             }
 
-            // Sync Icon
-            $iconFile = $data->icon instanceof Optional ? null : $data->icon;
-            $shouldDelete = $data->delete_icon instanceof Optional ? false : (bool)$data->delete_icon;
+            // Sync Icon (only when icon fields were sent on this request)
+            $iconFile = property_exists($data, 'icon') && ! ($data->icon instanceof Optional)
+                ? $data->icon
+                : null;
+            $shouldDelete = property_exists($data, 'delete_icon') && ! ($data->delete_icon instanceof Optional)
+                ? (bool) $data->delete_icon
+                : false;
 
             if ($iconFile !== null || $shouldDelete) {
-            $syncIconData = SyncAttributeIconData::from([
-                'icon' => $iconFile,
-                'delete_icon' => $shouldDelete
-            ]);
-            $this->SyncIconAction->execute($attribute, $syncIconData);
+                $syncIconData = SyncAttributeIconData::from([
+                    'icon' => $iconFile,
+                    'delete_icon' => $shouldDelete,
+                ]);
+                $this->SyncIconAction->execute($attribute, $syncIconData);
             }
 
             EavFilterRegistrar::flushEntityCache($attribute->entity_type);

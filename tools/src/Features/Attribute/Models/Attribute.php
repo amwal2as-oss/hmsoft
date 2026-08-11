@@ -113,4 +113,57 @@ class Attribute extends Model implements AutoFilterable, Activable, Sortable
     {
         return $this->entity_type;
     }
+
+    public function getRelationshipsExtra(): array
+    {
+        return [
+            'translation' => 'translation',
+            'categories' => ['categories', 'categories.category'],
+        ];
+    }
+
+    public function getFieldSelectionMapExtra(): array
+    {
+        return [
+            'title' => 'translation.title',
+            'category_id' => 'categories.category_id',
+            'category_ids' => 'categories.category_id',
+        ];
+    }
+
+    public function getFilterableExtra(): array
+    {
+        return [
+            'title',
+            'translation.title',
+            'categories.category_id',
+            'category_id',
+            'category_ids',
+            'input_type',
+            'code',
+            'entity_type',
+            'is_active',
+            'is_filterable',
+            'is_sortable',
+            'is_searchable',
+            'is_required',
+        ];
+    }
+
+    public function getSortableExtra(): array
+    {
+        return [
+            'sort_number',
+            'title',
+            'translation.title',
+            'created_at',
+        ];
+    }
+
+    public function defineGlobalSearchRelatedAttributes(): array
+    {
+        return [
+            'translation' => ['title', 'placeholder', 'help_text'],
+        ];
+    }
 }

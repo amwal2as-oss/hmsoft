@@ -23,14 +23,18 @@ class EavValuePresenter
             : InputTypeEnum::tryFrom((string) $attribute->input_type);
 
         if ($inputType?->isTranslatable()) {
-            return self::presentTranslations($value);
+            return self::presentTranslations($value) ?? self::presentFallback($value);
         }
 
         $valueType = $attribute->value_type instanceof ValueTypeEnum
             ? $attribute->value_type
-            : ValueTypeEnum::from((string) $attribute->value_type);
+            : ValueTypeEnum::tryFrom((string) $attribute->value_type);
 
-        return match ($valueType) {
+        if ($valueType === null) {
+            return self::presentFallback($value);
+        }
+
+        $presented = match ($valueType) {
             ValueTypeEnum::String => $value->value_text,
             ValueTypeEnum::Text => $value->value_long_text ?? $value->value_text,
             ValueTypeEnum::Number => $value->value_number !== null ? (float) $value->value_number : null,
@@ -41,6 +45,49 @@ class EavValuePresenter
                 ? $value->selectedOptions->pluck('attribute_option_id')->values()->all()
                 : [],
         };
+
+        if ($presented !== null && $presented !== '' && $presented !== []) {
+            return $presented;
+        }
+
+        return self::presentFallback($value) ?? $presented;
+    }
+
+    protected static function presentFallback(EavValue $value): mixed
+    {
+        if ($value->attribute_option_id !== null) {
+            return $value->attribute_option_id;
+        }
+
+        if ($value->value_number !== null) {
+            return (float) $value->value_number;
+        }
+
+        if ($value->value_boolean !== null) {
+            return (bool) $value->value_boolean;
+        }
+
+        if ($value->value_date !== null) {
+            return $value->value_date->format('Y-m-d');
+        }
+
+        if ($value->value_long_text !== null && $value->value_long_text !== '') {
+            return $value->value_long_text;
+        }
+
+        if ($value->value_text !== null && $value->value_text !== '') {
+            return $value->value_text;
+        }
+
+        if ($value->relationLoaded('selectedOptions') && $value->selectedOptions->isNotEmpty()) {
+            return $value->selectedOptions->pluck('attribute_option_id')->values()->all();
+        }
+
+        if ($value->relationLoaded('translations') && $value->translations->isNotEmpty()) {
+            return self::presentTranslations($value);
+        }
+
+        return null;
     }
 
     protected static function presentTranslations(EavValue $value): ?array

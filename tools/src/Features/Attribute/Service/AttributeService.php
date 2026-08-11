@@ -26,14 +26,10 @@ class AttributeService
     public function forObject(
         string $entityType,
         int|string $valuableId,
-        ?string $categoryType = null,
-        ?int $categoryId = null,
     ): array {
         $rows = $this->get_object_attributes_action->execute(
             entityType: $entityType,
             valuableId: $valuableId,
-            categoryType: $categoryType,
-            categoryId: $categoryId,
         );
 
         return AttributeData::collectWithValues($rows);

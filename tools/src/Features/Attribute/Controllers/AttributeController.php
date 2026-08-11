@@ -35,8 +35,6 @@ class AttributeController
         $data = $this->attributeService->forObject(
             entityType: $entityType,
             valuableId: $valuable,
-            categoryType: $request->query('category_type'),
-            categoryId: $request->filled('category_id') ? (int) $request->query('category_id') : null,
         );
 
         return CmsResponse::success(data: AttributeData::filterableCollect($data));

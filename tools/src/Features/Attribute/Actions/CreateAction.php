@@ -28,7 +28,7 @@ class CreateAction
                 'value_type'        => $inputType->valueType(),
                 'default_value'     => $data->default_value,
                 'validation_rules'  => $data->validation_rules,
-                'icon'              => $data->icon,
+                // 'icon'              => $data->icon,
                 'sort_number'       => $data->sort_number ?? 0,
                 'is_active'         => $data->is_active ?? true,
                 'is_filterable'     => $data->is_filterable ?? true,
@@ -52,7 +52,7 @@ class CreateAction
                     $option = $attribute->options()->create([
                         'code'        => EavCodeGenerator::forOption($optionData->code ?? null, $optionData->locales),
                         'color'       => $optionData->color ?? null,
-                        'icon'        => $optionData->icon ?? null,
+                        // 'icon'        => $optionData->icon ?? null,
                         'is_default'  => $optionData->is_default ?? false,
                         'is_active'   => $optionData->is_active ?? true,
                         'sort_number' => $optionData->sort_number ?? 0,
