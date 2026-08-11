@@ -2,6 +2,8 @@
 
 namespace HMsoft\Tools\Features\Media\Data;
 
+use HMsoft\Tools\Features\Media\Rules\FileOrUrl;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Request;
@@ -13,10 +15,22 @@ class UpdateMediaData extends Data
 {
     public function __construct(
         public readonly Optional|int $id,
+        public readonly UploadedFile|string|Optional $file,
+        public readonly Optional|bool $is_default,
+        public readonly Optional|string $media_type,
         public readonly Optional|array $locales,
         public readonly Optional|int $sort_number,
         public readonly Optional|array $custom_properties,
     ) {}
+
+    public static function prepareForPipeline(array $properties): array
+    {
+        if (array_key_exists('is_default', $properties)) {
+            $properties['is_default'] = filter_var($properties['is_default'], FILTER_VALIDATE_BOOLEAN);
+        }
+
+        return $properties;
+    }
 
     public static function rules(ValidationContext $context): array
     {
@@ -25,6 +39,9 @@ class UpdateMediaData extends Data
 
         return [
             'id'                        => ['sometimes', 'required', 'integer', 'exists:media,id'],
+            'file'                      => ['sometimes', new FileOrUrl()],
+            'is_default'                => ['sometimes', 'boolean'],
+            'media_type'                => ['sometimes', 'nullable', 'string'],
             'sort_number'               => ['sometimes', 'integer'],
             'custom_properties'         => ['sometimes', 'array'],
             'locales'                   => [$isNewMedia ? 'required' : 'sometimes', 'array', 'min:1'],
