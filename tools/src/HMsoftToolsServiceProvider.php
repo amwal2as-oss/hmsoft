@@ -14,6 +14,7 @@ class HMsoftToolsServiceProvider extends ServiceProvider
         $this->app->register(\HMsoft\Tools\Features\Response\Providers\ResponseServiceProvider::class);
         $this->app->register(\HMsoft\Tools\Features\OptionalAuth\Providers\OptionalAuthServiceProvider::class);
         $this->app->register(\HMsoft\Tools\Features\DynamicUrl\Providers\DynamicUrlServiceProvider::class);
+        $this->app->register(\HMsoft\Tools\Features\Localization\Providers\LocalizationServiceProvider::class);
         // لاحقاً سنضيف هنا: DynamicFiltersServiceProvider, SecurityServiceProvider, MediaServiceProvider
     }
 
