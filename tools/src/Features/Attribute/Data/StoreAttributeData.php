@@ -4,6 +4,7 @@ namespace HMsoft\Tools\Features\Attribute\Data;
 
 use HMsoft\Tools\Features\Attribute\Enums\InputTypeEnum;
 use HMsoft\Tools\Features\Attribute\Rules\ValidMorphCategory;
+use HMsoft\Tools\Features\Attribute\Support\PrunesEmptyLocales;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Spatie\LaravelData\Attributes\DataCollectionOf;
@@ -77,6 +78,20 @@ class StoreAttributeData extends Data
             }
         }
 
+        if (isset($properties['locales']) && is_array($properties['locales'])) {
+            $properties['locales'] = PrunesEmptyLocales::prune($properties['locales'], 'title');
+        }
+
+        if (isset($properties['options']) && is_array($properties['options'])) {
+            foreach ($properties['options'] as $index => $option) {
+                if (! is_array($option) || ! isset($option['locales']) || ! is_array($option['locales'])) {
+                    continue;
+                }
+
+                $properties['options'][$index]['locales'] = PrunesEmptyLocales::prune($option['locales'], 'label');
+            }
+        }
+
         return $properties;
     }
 
@@ -112,7 +127,16 @@ class StoreAttributeData extends Data
             'locales.*.title'    => ['required', 'string', 'max:255'],
             'locales.*.placeholder' => ['nullable', 'string', 'max:255'],
             'locales.*.help_text'   => ['nullable', 'string'],
-            'options'            => ['required_if:input_type,select,radio,multi_select,checkbox', 'array'],
+            'options'            => [
+                Rule::requiredIf(fn () => InputTypeEnum::tryFrom((string) ($fullPayload['input_type'] ?? ''))?->hasOptions() ?? false),
+                'array',
+            ],
+            'options.*.color'    => [
+                Rule::requiredIf(fn () => ($fullPayload['input_type'] ?? null) === InputTypeEnum::Color->value),
+                'nullable',
+                'string',
+                'max:20',
+            ],
         ];
     }
 }

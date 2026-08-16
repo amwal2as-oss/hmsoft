@@ -2,6 +2,7 @@
 
 namespace HMsoft\Tools\Features\Attribute\Data;
 
+use HMsoft\Tools\Features\Attribute\Support\PrunesEmptyLocales;
 use Spatie\LaravelData\Data;
 
 class StoreAttributeOptionData extends Data
@@ -27,7 +28,7 @@ class StoreAttributeOptionData extends Data
             'sort_number'        => ['sometimes', 'integer'],
             'locales'            => ['required', 'array', 'min:1'],
             'locales.*.locale'   => ['required', 'string'],
-            'locales.*.label'    => ['required', 'string', 'max:255'], // تم الاعتماد على label فقط
+            'locales.*.label'    => ['required', 'string', 'max:255'],
         ];
     }
 
@@ -38,6 +39,11 @@ class StoreAttributeOptionData extends Data
                 $properties[$field] = filter_var($properties[$field], FILTER_VALIDATE_BOOLEAN);
             }
         }
+
+        if (isset($properties['locales']) && is_array($properties['locales'])) {
+            $properties['locales'] = PrunesEmptyLocales::prune($properties['locales'], 'label');
+        }
+
         return $properties;
     }
 }

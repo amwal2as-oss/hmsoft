@@ -54,10 +54,11 @@ trait IsAutoFilterable
      */
     public function defineFilterableAttributes(): array
     {
-        return array_unique(array_merge(
+        return array_values(array_unique(array_merge(
             $this->getFilterableBase(),
-            $this->getFilterableExtra()
-        ));
+            $this->getFilterableExtra(),
+            $this->resolveEavFilterableAttributes()
+        )));
     }
 
     /**
@@ -70,17 +71,8 @@ trait IsAutoFilterable
         // EN: 1. Automatically fetch real table columns | AR: 1. جلب أعمدة الجدول الحقيقية تلقائياً
         $columns = $this->getCachedTableColumns($this->getTable());
 
-        // EN: 2. Fetch custom attributes marked as filterable | AR: 2. جلب الحقول الديناميكية المحددة كقابلة للفلترة
-        $customFilters = [];
-        // if (method_exists($this, 'getMorphClass')) {
-        //     $customFilters = Attribute::ofScope($this->getMorphClass())
-        //         ->where('is_filterable', true)
-        //         ->pluck('id')
-        //         ->map(fn($id) => 'attribute_' . $id)
-        //         ->toArray();
-        // }
-
-        return array_merge($columns, $customFilters);
+        // EN: 2. EAV keys are merged in defineFilterableAttributes() via HasEavAttributes
+        return $columns;
     }
 
     /**
@@ -105,10 +97,11 @@ trait IsAutoFilterable
      */
     public function defineSortableAttributes(): array
     {
-        return array_unique(array_merge(
+        return array_values(array_unique(array_merge(
             $this->getSortableBase(),
-            $this->getSortableExtra()
-        ));
+            $this->getSortableExtra(),
+            $this->resolveEavSortableAttributes()
+        )));
     }
 
     /**
@@ -120,16 +113,7 @@ trait IsAutoFilterable
     {
         $columns = $this->getCachedTableColumns($this->getTable());
 
-        $customSorts = [];
-        // if (method_exists($this, 'getMorphClass')) {
-        //     $customSorts = Attribute::ofScope($this->getMorphClass())
-        //         ->where('is_sortable', true)
-        //         ->pluck('id')
-        //         ->map(fn($id) => 'attribute_' . $id)
-        //         ->toArray();
-        // }
-
-        return array_merge($columns, $customSorts);
+        return $columns;
     }
 
     /**
@@ -155,6 +139,7 @@ trait IsAutoFilterable
     {
         return array_merge(
             $this->getFieldSelectionMapBase(),
+            $this->resolveEavFieldSelectionMap(),
             $this->getFieldSelectionMapExtra()
         );
     }
@@ -181,6 +166,36 @@ trait IsAutoFilterable
     protected function getFieldSelectionMapExtra(): array
     {
         return [];
+    }
+
+    /**
+     * @return list<string>
+     */
+    protected function resolveEavFilterableAttributes(): array
+    {
+        return method_exists($this, 'getEavFilterableExtra')
+            ? (array) $this->getEavFilterableExtra()
+            : [];
+    }
+
+    /**
+     * @return list<string>
+     */
+    protected function resolveEavSortableAttributes(): array
+    {
+        return method_exists($this, 'getEavSortableExtra')
+            ? (array) $this->getEavSortableExtra()
+            : [];
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    protected function resolveEavFieldSelectionMap(): array
+    {
+        return method_exists($this, 'getEavFieldSelectionMap')
+            ? (array) $this->getEavFieldSelectionMap()
+            : [];
     }
 
     /* -----------------------------------------------------------------

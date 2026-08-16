@@ -54,9 +54,14 @@ class UpdateAction
 
             // Sync Options
             $optionsData = $data->options instanceof Optional ? null : $data->options;
-            $currentInputType = isset($updateData['input_type']) ? $updateData['input_type'] : ($attribute->input_type->value ?? $attribute->input_type);
-            
-            if ($optionsData !== null && in_array($currentInputType, ['select', 'radio', 'checkbox', 'multi_select'])) {
+            $currentInputType = isset($updateData['input_type'])
+                ? $updateData['input_type']
+                : ($attribute->input_type->value ?? $attribute->input_type);
+            $inputTypeEnum = $currentInputType instanceof InputTypeEnum
+                ? $currentInputType
+                : InputTypeEnum::tryFrom((string) $currentInputType);
+
+            if ($optionsData !== null && $inputTypeEnum?->hasOptions()) {
                 $keepOptionIds = [];
 
                 foreach ($optionsData as $optData) {
@@ -77,7 +82,7 @@ class UpdateAction
                 }
 
                 $attribute->options()->whereNotIn('id', $keepOptionIds)->delete();
-            } elseif (isset($updateData['input_type']) && !in_array($updateData['input_type'], ['select', 'radio', 'checkbox', 'multi_select'])) {
+            } elseif (isset($updateData['input_type']) && ! $inputTypeEnum?->hasOptions()) {
                 $attribute->options()->delete();
             }
 

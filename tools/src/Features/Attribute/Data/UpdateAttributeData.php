@@ -5,6 +5,7 @@ namespace HMsoft\Tools\Features\Attribute\Data;
 use HMsoft\Tools\Features\Attribute\Enums\InputTypeEnum;
 use HMsoft\Tools\Features\Media\Rules\FileOrUrl;
 use HMsoft\Tools\Features\Attribute\Rules\ValidMorphCategory;
+use HMsoft\Tools\Features\Attribute\Support\PrunesEmptyLocales;
 use Illuminate\Support\Facades\Request;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
@@ -68,6 +69,20 @@ class UpdateAttributeData extends Data
             }
         }
 
+        if (isset($properties['locales']) && is_array($properties['locales'])) {
+            $properties['locales'] = PrunesEmptyLocales::prune($properties['locales'], 'title');
+        }
+
+        if (isset($properties['options']) && is_array($properties['options'])) {
+            foreach ($properties['options'] as $index => $option) {
+                if (! is_array($option) || ! isset($option['locales']) || ! is_array($option['locales'])) {
+                    continue;
+                }
+
+                $properties['options'][$index]['locales'] = PrunesEmptyLocales::prune($option['locales'], 'label');
+            }
+        }
+
         return $properties;
     }
 
@@ -98,6 +113,17 @@ class UpdateAttributeData extends Data
             'sort_number'        => ['sometimes', 'integer'],
 
             'options'            => ['sometimes', 'nullable', 'array'],
+            'options.*.color'    => [
+                'sometimes',
+                'nullable',
+                'string',
+                'max:20',
+                Rule::requiredIf(function () use ($fullPayload) {
+                    $inputType = $fullPayload['input_type'] ?? null;
+
+                    return $inputType === InputTypeEnum::Color->value;
+                }),
+            ],
 
             'locales'            => ['sometimes', 'array', 'min:1'],
             'locales.*.locale'   => ['required_with:locales', 'string'],

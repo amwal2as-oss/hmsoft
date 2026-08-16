@@ -77,4 +77,9 @@ trait HasEavAttributes
     {
         return EavFilterRegistrar::sortableKeysForEntity($this->eavEntityType());
     }
+
+    protected function getEavFieldSelectionMap(): array
+    {
+        return EavFilterRegistrar::fieldMapForEntity($this->eavEntityType());
+    }
 }

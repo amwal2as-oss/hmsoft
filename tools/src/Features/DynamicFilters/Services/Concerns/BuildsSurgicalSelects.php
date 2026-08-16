@@ -77,6 +77,19 @@ trait BuildsSurgicalSelects
 
                 if (isset($allowedRelations[$rootRelation])) {
                     $this->injectRelationForeignKeys($relationPath, $selectColumns, $mainAlias);
+
+                    $nestedRelationPath = $relationPath . '.' . $columnName;
+                    $nestedRelation = $this->relationInstanceAtPath($nestedRelationPath);
+
+                    if ($nestedRelation instanceof \Illuminate\Database\Eloquent\Relations\HasMany
+                        || $nestedRelation instanceof \Illuminate\Database\Eloquent\Relations\BelongsToMany
+                        || $nestedRelation instanceof \Illuminate\Database\Eloquent\Relations\MorphMany
+                        || $nestedRelation instanceof \Illuminate\Database\Eloquent\Relations\MorphToMany
+                    ) {
+                        $relationsToLoad[] = $nestedRelationPath;
+                        continue;
+                    }
+
                     $relationInstance = method_exists($this->model, \Illuminate\Support\Str::camel($rootRelation))
                         ? $this->model->{\Illuminate\Support\Str::camel($rootRelation)}()
                         : null;
@@ -111,6 +124,34 @@ trait BuildsSurgicalSelects
         if (!empty($relationsToLoad)) {
             $query->with(array_unique($relationsToLoad));
         }
+    }
+
+    private function relationInstanceAtPath(string $path): ?\Illuminate\Database\Eloquent\Relations\Relation
+    {
+        $currentModel = $this->model;
+        $instance = null;
+
+        foreach (explode('.', $path) as $segment) {
+            $methodName = \Illuminate\Support\Str::camel($segment);
+
+            if (! method_exists($currentModel, $methodName)) {
+                return null;
+            }
+
+            try {
+                $instance = $currentModel->{$methodName}();
+            } catch (\Exception $e) {
+                return null;
+            }
+
+            if (! $instance instanceof \Illuminate\Database\Eloquent\Relations\Relation) {
+                return null;
+            }
+
+            $currentModel = $instance->getRelated();
+        }
+
+        return $instance;
     }
 
     private function parseRelationAndColumn(string $dbPath): array

@@ -6,6 +6,7 @@ use HMsoft\Tools\Features\DynamicFilters\Services\JoinManager;
 use HMsoft\Tools\Features\DynamicFilters\Data\ColumnFilterData;
 use HMsoft\Tools\Features\DynamicFilters\Enums\FilterFnsEnum;
 use HMsoft\Tools\Features\DynamicFilters\Contracts\AutoFilterable;
+use HMsoft\Tools\Features\Attribute\Services\EavAttributeQuery;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 
@@ -87,6 +88,10 @@ trait AppliesFilters
 
             if (method_exists($model, $scopeName)) {
                 $query->{$methodName}($tempFilter);
+                continue;
+            }
+
+            if (app(EavAttributeQuery::class)->tryApplyFromFilter($query, $tempFilter)) {
                 continue;
             }
 

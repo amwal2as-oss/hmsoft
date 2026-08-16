@@ -4,6 +4,7 @@ namespace HMsoft\Tools\Features\DynamicFilters\Services\Concerns;
 
 use HMsoft\Tools\Features\DynamicFilters\Services\JoinManager;
 use HMsoft\Tools\Features\DynamicFilters\Contracts\AutoFilterable;
+use HMsoft\Tools\Features\Attribute\Services\EavAttributeQuery;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Str;
@@ -39,6 +40,10 @@ trait AppliesSorting
 
             if (method_exists($model, $scopeName)) {
                 $query->{$methodName}($sortDirection);
+                continue;
+            }
+
+            if (app(EavAttributeQuery::class)->tryApplySort($query, $columnId, $sortDirection)) {
                 continue;
             }
 

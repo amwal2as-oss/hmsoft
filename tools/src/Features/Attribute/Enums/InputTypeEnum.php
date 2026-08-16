@@ -18,9 +18,9 @@ enum InputTypeEnum: string
     public function valueType(): ValueTypeEnum
     {
         return match ($this) {
-            self::Text, self::Color => ValueTypeEnum::String,
+            self::Text => ValueTypeEnum::String,
             self::Textarea => ValueTypeEnum::Text,
-            self::Select, self::Radio => ValueTypeEnum::Option,
+            self::Select, self::Radio, self::Color => ValueTypeEnum::Option,
             self::MultiSelect, self::Checkbox => ValueTypeEnum::Options,
             self::Number => ValueTypeEnum::Number,
             self::Date => ValueTypeEnum::Date,
@@ -43,7 +43,19 @@ enum InputTypeEnum: string
             self::MultiSelect,
             self::Radio,
             self::Checkbox,
+            self::Color,
         ], true);
+    }
+
+    /**
+     * @return list<string>
+     */
+    public static function optionValues(): array
+    {
+        return array_values(array_map(
+            fn (self $case) => $case->value,
+            array_filter(self::cases(), fn (self $case) => $case->hasOptions())
+        ));
     }
 
     public static function values(): array
