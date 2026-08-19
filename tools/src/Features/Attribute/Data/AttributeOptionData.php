@@ -4,6 +4,7 @@ namespace HMsoft\Tools\Features\Attribute\Data;
 
 use HMsoft\Tools\Features\Attribute\Models\AttributeOption;
 use HMsoft\Tools\Features\DynamicFilters\Data\BaseData;
+use HMsoft\Tools\Features\Translations\Support\TranslatableResponse;
 use Spatie\LaravelData\Optional;
 
 class AttributeOptionData extends BaseData
@@ -22,11 +23,7 @@ class AttributeOptionData extends BaseData
 
     public static function fromModel(AttributeOption $option): self
     {
-        $defaultTranslation = null;
-        if ($option->relationLoaded('translations')) {
-            $defaultTranslation = $option->translations->firstWhere('locale', app()->getLocale())
-                ?? $option->translations->first();
-        }
+        $resolved = TranslatableResponse::resolve($option);
 
         return new self(
             id: $option->id,
@@ -36,11 +33,9 @@ class AttributeOptionData extends BaseData
             is_default: $option->is_default,
             is_active: $option->is_active,
             sort_number: $option->sort_number,
-            label: $defaultTranslation?->label,
+            label: $resolved['label'] ?? null,
             translations: $option->relationLoaded('translations')
-                ? $option->translations->mapWithKeys(fn ($t) => [
-                    $t->locale => ['label' => $t->label],
-                ])->toArray()
+                ? TranslatableResponse::map($option, ['label'])
                 : Optional::create(),
         );
     }

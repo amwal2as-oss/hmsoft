@@ -12,7 +12,7 @@ Enterprise-grade Entity-Attribute-Value engine for Laravel CMS APIs. Attach cust
 |------------|-------------|
 | **Morph values** | Store attribute values on any Eloquent model via `valuable_type` morph alias |
 | **10 input types** | text, textarea, select, multi_select, radio, checkbox, color, number, date, boolean |
-| **Translations** | Attribute labels, option labels, and translatable text values |
+| **Translations** | Attribute labels, option labels, and translatable text values, with locale fallback via `TranslatableResponse` (see Translations [docs/RESPONSE_FALLBACK.md](../Translations/docs/RESPONSE_FALLBACK.md)) |
 | **Category scoping** | Limit attributes to specific categories per entity |
 | **Typed storage** | Indexed columns for fast filter/sort (`value_number`, `value_date`, etc.) |
 | **AutoFilter keys** | Dynamic filter keys like `eav.weight`, `eav.material` |

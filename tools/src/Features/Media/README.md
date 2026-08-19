@@ -413,11 +413,26 @@ await fetch(`/api/legislation/${id}/sync-files`, { method: 'POST', body: formDat
 
 ### Standalone Media API
 
+Single file (`file` at the root):
+
 ```typescript
 const formData = new FormData();
 formData.append('file', file);
-formData.append('media_type', 'attachment');
+formData.append('media_type', 'video');
 formData.append('is_default', 'false');
+
+await fetch(`/api/blog/${blogId}/media`, { method: 'POST', body: formData });
+```
+
+One or more files (`media[0][file]`). Same `POST /media` URL, or `POST /media/bulk`:
+
+```typescript
+const formData = new FormData();
+files.forEach((file, i) => {
+  formData.append(`media[${i}][file]`, file);
+  formData.append(`media[${i}][media_type]`, 'video');
+  formData.append(`media[${i}][is_default]`, 'false');
+});
 
 await fetch(`/api/blog/${blogId}/media`, { method: 'POST', body: formData });
 ```
@@ -508,7 +523,7 @@ Migrations auto-load via `MediaServiceProvider`. Publish with `--tag=cms_media-m
 | File not deleted on replace | Check disk matches `$cmsMediaDisk` / config |
 | PDF uploaded as WebP | Non-images skip conversion — verify extension |
 | `delete_image` ignored | Pass `delete_image: true` when no new file |
-| Gallery files not listed | Load `$model->mediaList` or use Media API index |
+| `file required` on POST `/media` | Send either root `file` or `media[0][file]`. Do not mix the field names on the wrong shape. |
 
 ---
 

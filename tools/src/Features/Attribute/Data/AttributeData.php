@@ -6,8 +6,10 @@ use HMsoft\Tools\Features\Attribute\Models\Attribute;
 use HMsoft\Tools\Features\Attribute\Models\EavValue;
 use HMsoft\Tools\Features\Attribute\Services\EavValuePresenter;
 use HMsoft\Tools\Features\DynamicFilters\Data\BaseData;
+use HMsoft\Tools\Features\Translations\Support\TranslatableResponse;
 use Spatie\LaravelData\Attributes\DataCollectionOf;
 use Spatie\LaravelData\DataCollection;
+use Spatie\LaravelData\Lazy;
 use Spatie\LaravelData\Optional;
 
 class AttributeData extends BaseData
@@ -43,11 +45,7 @@ class AttributeData extends BaseData
 
     public static function fromModel(Attribute $attribute): self
     {
-        $defaultTranslation = null;
-        if ($attribute->relationLoaded('translations')) {
-            $defaultTranslation = $attribute->translations->firstWhere('locale', app()->getLocale())
-                ?? $attribute->translations->first();
-        }
+        $resolved = TranslatableResponse::resolve($attribute);
 
         $inputType = $attribute->input_type?->value ?? $attribute->input_type;
         $valueType = $attribute->value_type?->value ?? $attribute->value_type;
@@ -68,15 +66,9 @@ class AttributeData extends BaseData
             is_searchable: $attribute->is_searchable,
             is_required: $attribute->is_required,
             sort_number: $attribute->sort_number,
-            title: $defaultTranslation?->title,
+            title: $resolved['title'] ?? null,
             translations: $attribute->relationLoaded('translations')
-                ? $attribute->translations->mapWithKeys(fn($t) => [
-                    $t->locale => [
-                        'title' => $t->title,
-                        'placeholder' => $t->placeholder,
-                        'help_text' => $t->help_text,
-                    ],
-                ])->toArray()
+                ? TranslatableResponse::map($attribute, ['title', 'placeholder', 'help_text'])
                 : Optional::create(),
 
             // --- الاستدعاء الذكي للفئات (Polymorphism) ---

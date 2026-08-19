@@ -3,8 +3,9 @@
 namespace HMsoft\Tools\Features\Media\Data;
 
 use HMsoft\Tools\Features\Media\Rules\FileOrUrl;
-use Illuminate\Http\UploadedFile;
+use HMsoft\Tools\Features\Media\Support\MediaStorePayload;
 use HMsoft\Tools\Features\Media\Traits\ExtractsOwnerFromRoute;
+use Illuminate\Http\UploadedFile;
 use Spatie\LaravelData\Data;
 use Spatie\LaravelData\Optional;
 
@@ -24,6 +25,8 @@ class StoreMediaData extends Data
 
     public static function prepareForPipeline(array $properties): array
     {
+        $properties = self::unwrapNestedMediaItem($properties);
+
         $ownerData = self::getOwnerFromRoute();
 
         if (!isset($properties['owner_id']) && !empty($ownerData['owner_id'])) {
@@ -52,5 +55,43 @@ class StoreMediaData extends Data
             'folder'      => ['nullable', 'string'],
             'locales'     => ['nullable', 'array'],
         ];
+    }
+
+    /**
+     * Accept either root `file` or the first bulk item `media[0][file]`.
+     *
+     * @param  array<string, mixed>  $properties
+     * @return array<string, mixed>
+     */
+    private static function unwrapNestedMediaItem(array $properties): array
+    {
+        if (! MediaStorePayload::isMissingFile($properties['file'] ?? null)) {
+            return $properties;
+        }
+
+        $media = $properties['media'] ?? null;
+        if (! is_array($media) || $media === []) {
+            return $properties;
+        }
+
+        $first = $media[0] ?? reset($media);
+
+        if ($first instanceof UploadedFile) {
+            $properties['file'] = $first;
+
+            return $properties;
+        }
+
+        if (! is_array($first)) {
+            return $properties;
+        }
+
+        foreach (['file', 'media_type', 'is_default', 'locales', 'folder'] as $key) {
+            if (MediaStorePayload::isMissingFile($properties[$key] ?? null) && array_key_exists($key, $first)) {
+                $properties[$key] = $first[$key];
+            }
+        }
+
+        return $properties;
     }
 }

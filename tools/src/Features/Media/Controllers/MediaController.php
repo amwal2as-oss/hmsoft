@@ -5,6 +5,7 @@ namespace HMsoft\Tools\Features\Media\Controllers;
 use HMsoft\Tools\Features\Media\Data\{BulkDeleteMediaData, MediaData, StoreBulkMediaData, StoreMediaData, UpdateAllMediaData, UpdateMediaData};
 use HMsoft\Tools\Features\Media\Models\Medium;
 use HMsoft\Tools\Features\Media\Service\MediaService;
+use HMsoft\Tools\Features\Media\Support\MediaStorePayload;
 use HMsoft\Tools\Features\Media\Traits\ExtractsOwnerFromRoute;
 use HMsoft\Tools\Features\Response\Facades\CmsResponse;
 use Illuminate\Http\Request;
@@ -32,11 +33,27 @@ class MediaController
         return CmsResponse::success(data: MediaData::fromModel($this->mediaService->show($medium)));
     }
 
-    public function store(StoreMediaData $data)
+    public function store(Request $request)
     {
         $owner = self::resolveOwnerModel();
+
+        if (MediaStorePayload::isBulk($request)) {
+            $data = StoreBulkMediaData::from($request);
+            $mediaCollection = $this->mediaService->storeBulk($owner, $data);
+
+            return CmsResponse::success(
+                message: __('media::messages.added_successfully'),
+                data: MediaData::filterableCollect($mediaCollection)
+            );
+        }
+
+        $data = StoreMediaData::from($request);
         $media = $this->mediaService->store($owner, $data);
-        return CmsResponse::success(message: __('media::messages.added_successfully'), data: MediaData::fromModel($media));
+
+        return CmsResponse::success(
+            message: __('media::messages.added_successfully'),
+            data: MediaData::fromModel($media)
+        );
     }
 
     public function storeBulk(StoreBulkMediaData $data)

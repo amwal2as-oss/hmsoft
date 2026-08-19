@@ -2,6 +2,8 @@
 
 This documentation provides a comprehensive architectural guide on how to integrate, use, and override the core features (`Translations`, `Attribute`, and `Faq`) within your Laravel application using Domain-Driven Design (DDD) principles.
 
+**Response fallback (API titles / EAV labels):** see [docs/RESPONSE_FALLBACK.md](docs/RESPONSE_FALLBACK.md).
+
 ---
 
 ## 1. Translations Feature
@@ -36,8 +38,11 @@ class Feature extends Model implements Translatable
 // Eager load the active locale translation automatically
 $feature = Feature::with('translation')->first();
 
-// Access the current translation safely
+// Access the current translation safely (no fallback if that locale row is empty)
 $title = $feature->translation?->title;
+
+// Prefer this for API display fields: requested locale, then fallback locale, then any other
+$title = \HMsoft\Tools\Features\Translations\Support\TranslatableResponse::value($feature, 'title');
 
 // Access all translations array
 $allTranslations = $feature->translations;
