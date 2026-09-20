@@ -6,6 +6,7 @@ Automatic Eloquent filtering for active/inactive records (`is_active` by default
 
 ```text
 HMsoft/Tools/Features/Active/
+├── ActiveScope.php            # App-wide apply condition holder
 ├── Contracts/
 │   └── Activable.php          # Model contract
 ├── Traits/
@@ -95,11 +96,15 @@ public function shouldApplyActiveScope(): bool
 }
 ```
 
-**App-wide** — set a callable on the trait:
+**App-wide** — set a callable on `ActiveScope` (applies to every model using the trait, including vendor EAV models):
 
 ```php
-HasActiveScope::$applyScopeCondition = fn () => ! auth()->user()?->isAdmin();
+use HMsoft\Tools\Features\Active\ActiveScope;
+
+ActiveScope::$applyCondition = fn () => ! auth()->user()?->isAdmin();
 ```
+
+**Per model class** — `HasActiveScope::$applyScopeCondition` on that model still overrides the app-wide hook.
 
 **Per request** — add `resolveActiveScopeCondition()` on the model (common pattern in this project via `ApplyActiveScopeForNotAdmin`).
 

@@ -2,6 +2,7 @@
 
 namespace HMsoft\Tools\Features\Active\Traits;
 
+use HMsoft\Tools\Features\Active\ActiveScope;
 use HMsoft\Tools\Features\Active\Contracts\Activable;
 use Illuminate\Database\Eloquent\Builder;
 
@@ -31,9 +32,9 @@ use Illuminate\Database\Eloquent\Builder;
 trait HasActiveScope
 {
     /**
-     * Global callable to control scope application for all models using this trait.
+     * Per-model callable; wins over {@see ActiveScope::$applyCondition}.
      *
-     * @var callable(): bool|null
+     * @var (callable(): bool)|null
      */
     public static $applyScopeCondition = null;
 
@@ -100,8 +101,12 @@ trait HasActiveScope
     /** @inheritdoc */
     public function shouldApplyActiveScope(): bool
     {
-        if (is_callable(self::$applyScopeCondition)) {
-            return call_user_func(self::$applyScopeCondition);
+        if (is_callable(static::$applyScopeCondition)) {
+            return (bool) call_user_func(static::$applyScopeCondition);
+        }
+
+        if (is_callable(ActiveScope::$applyCondition)) {
+            return (bool) call_user_func(ActiveScope::$applyCondition);
         }
 
         return true;

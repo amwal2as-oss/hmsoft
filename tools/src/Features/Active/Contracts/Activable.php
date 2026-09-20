@@ -52,7 +52,8 @@ interface Activable
      * Default in `HasActiveScope`: `true`.
      * Return `false` to skip filtering (e.g. admin panel sees all rows).
      *
-     * You can also set `HasActiveScope::$applyScopeCondition` globally.
+     * You can also set {@see \HMsoft\Tools\Features\Active\ActiveScope::$applyCondition}
+     * app-wide, or per-model {@see \HMsoft\Tools\Features\Active\Traits\HasActiveScope::$applyScopeCondition}.
      *
      * @return bool
      */
