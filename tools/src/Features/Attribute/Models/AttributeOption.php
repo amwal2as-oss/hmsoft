@@ -6,6 +6,7 @@ use HMsoft\Tools\Features\Active\Contracts\Activable;
 use HMsoft\Tools\Features\Active\Traits\HasActiveScope;
 use HMsoft\Tools\Features\Attribute\Support\EavConfig;
 use HMsoft\Tools\Features\Audit\Traits\HasDynamicSyncAndAudit;
+use HMsoft\Tools\Features\SortNumber\Traits\HasSortNumber;
 use HMsoft\Tools\Features\Translations\Traits\HasTranslations;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -15,7 +16,10 @@ class AttributeOption extends Model implements Activable
 {
     use HasActiveScope,
         HasDynamicSyncAndAudit,
+        HasSortNumber,
         HasTranslations;
+
+    public const SORT_NUMBER_CONTEXT = ['attribute_id'];
 
     protected $guarded = ['id'];
 

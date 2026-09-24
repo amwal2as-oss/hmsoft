@@ -8,6 +8,7 @@ use HMsoft\Tools\Features\Translations\Contracts\Translatable;
 use HMsoft\Tools\Features\Translations\Traits\HasTranslations;
 use HMsoft\Tools\Features\DynamicFilters\Contracts\AutoFilterable;
 use HMsoft\Tools\Features\DynamicFilters\Traits\IsAutoFilterable;
+use HMsoft\Tools\Features\SortNumber\Traits\HasSortNumber;
 use Illuminate\Database\Eloquent\Casts\Attribute as EloquentAttribute;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\MorphTo;
@@ -17,7 +18,9 @@ use Illuminate\Support\Facades\Storage;
 class Medium extends Model implements AutoFilterable, Translatable
 {
 
-    use  IsAutoFilterable, HasTranslations, HasDynamicSyncAndAudit,Auditable;
+    use IsAutoFilterable, HasTranslations, HasDynamicSyncAndAudit, Auditable, HasSortNumber;
+
+    public const SORT_NUMBER_CONTEXT = ['owner_type', 'owner_id'];
 
     public const DEFAULT_INCLUDES = ['translations'];
 

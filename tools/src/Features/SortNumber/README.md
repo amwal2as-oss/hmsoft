@@ -33,6 +33,14 @@ class Category extends Model implements Sortable
 
 When you create a new Category, the sort_number will automatically be calculated as MAX(sort_number) + 1.
 
+Collision insert-and-shift (occupied rank → later rows `+1`) is implemented in the consuming API (`App\Support\SortNumber\SortNumberShifter`, see `docs/sort-number-collision-shift.md`). Scope nested lists with:
+
+```php
+public const SORT_NUMBER_CONTEXT = ['parent_id'];
+```
+
+`0` / `null` is not a rank. Empty values still get `MAX + 1` on create.
+
 ⚙️ Customization
 Changing the Column Name
 By default, the trait looks for a column named sort_number. If your table uses a different column name (e.g., order_index), you can customize it in one of three ways:

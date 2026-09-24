@@ -102,7 +102,16 @@ class EavValueSyncService
     {
         $inputType = $attribute->input_type instanceof InputTypeEnum
             ? $attribute->input_type
-            : InputTypeEnum::from($attribute->input_type);
+            : InputTypeEnum::from((string) $attribute->input_type);
+
+        if ($inputType === InputTypeEnum::Textarea) {
+            $locales = $this->normalizeTranslatableValue($rawValue);
+            if ($locales !== []) {
+                $this->persistTranslatableValue($owner, $attribute, $locales);
+            }
+
+            return;
+        }
 
         if ($inputType->isTranslatable() && is_array($rawValue)) {
             $this->persistTranslatableValue($owner, $attribute, $rawValue);
@@ -120,22 +129,41 @@ class EavValueSyncService
         }
     }
 
+    /**
+     * @return array<string, mixed>
+     */
+    protected function normalizeTranslatableValue(mixed $rawValue): array
+    {
+        if (is_array($rawValue)) {
+            return $rawValue;
+        }
+
+        if ($rawValue === null || $rawValue === '') {
+            return [];
+        }
+
+        return [app()->getLocale() => (string) $rawValue];
+    }
+
     protected function persistTranslatableValue(Model $owner, Attribute $attribute, array $localeValues): void
     {
         $value = $owner->eavValues()->create([
             'attribute_id' => $attribute->id,
         ]);
 
+        $inputType = $attribute->input_type instanceof InputTypeEnum
+            ? $attribute->input_type
+            : InputTypeEnum::tryFrom((string) $attribute->input_type);
+        $isLong = $inputType === InputTypeEnum::Textarea;
+
         foreach ($localeValues as $locale => $text) {
             if ($text === null || $text === '') {
                 continue;
             }
 
-            $isLong = $attribute->input_type === InputTypeEnum::Textarea;
-
             EavValueTranslation::create([
                 'value_id' => $value->id,
-                'locale' => $locale,
+                'locale' => (string) $locale,
                 'value_text' => $isLong ? null : (string) $text,
                 'value_long_text' => $isLong ? (string) $text : null,
             ]);

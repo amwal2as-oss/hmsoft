@@ -96,11 +96,14 @@ class EavValuePresenter
             return null;
         }
 
-        return $value->translations
+        $presented = $value->translations
             ->mapWithKeys(fn ($row) => [
-                $row->locale => $row->value_long_text ?? $row->value_text,
+                $row->locale => $row->value_long_text ?: $row->value_text,
             ])
+            ->filter(fn ($text) => $text !== null && $text !== '')
             ->all();
+
+        return $presented === [] ? null : $presented;
     }
 
     protected static function presentDefault(Attribute $attribute): mixed

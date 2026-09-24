@@ -39,6 +39,8 @@ class Attribute extends Model implements AutoFilterable, Activable, Sortable
     ];
     public const MEDIA_FOLDER = 'attributes';
 
+    public const SORT_NUMBER_CONTEXT = ['entity_type'];
+
     protected array $cmsMediaFields = ['icon'];
     public string $cmsMediaSet = 'attributes';
 

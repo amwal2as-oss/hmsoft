@@ -26,11 +26,34 @@ trait HasSortNumber
 
     /**
      * Default Contextual Scope Resolver.
-     * Automatically sniffs for common architectural partitioning fields like 'scope'.
+     * Uses SORT_NUMBER_CONTEXT / $sortNumberContext when set.
      */
     public function scopeSortByContext(Builder $query): Builder
     {
+        foreach ($this->getSortNumberContextColumns() as $column) {
+            $value = $this->getAttribute($column);
+            $query = $value === null
+                ? $query->whereNull($column)
+                : $query->where($column, $value);
+        }
+
         return $query;
+    }
+
+    /**
+     * @return list<string>
+     */
+    public function getSortNumberContextColumns(): array
+    {
+        if (defined('static::SORT_NUMBER_CONTEXT')) {
+            return (array) static::SORT_NUMBER_CONTEXT;
+        }
+
+        if (property_exists($this, 'sortNumberContext')) {
+            return (array) $this->sortNumberContext;
+        }
+
+        return [];
     }
 
     /**
