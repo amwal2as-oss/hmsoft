@@ -11,6 +11,7 @@ class HMsoftToolsServiceProvider extends ServiceProvider
         // تسجيل المزودات المستقلة لكل Feature
         $this->app->register(\HMsoft\Tools\Features\Active\Providers\ActiveServiceProvider::class);
         $this->app->register(\HMsoft\Tools\Features\SortNumber\Providers\SortNumberServiceProvider::class);
+        $this->app->register(\HMsoft\Tools\Features\BulkDelete\Providers\BulkDeleteServiceProvider::class);
         $this->app->register(\HMsoft\Tools\Features\Response\Providers\ResponseServiceProvider::class);
         $this->app->register(\HMsoft\Tools\Features\OptionalAuth\Providers\OptionalAuthServiceProvider::class);
         $this->app->register(\HMsoft\Tools\Features\DynamicUrl\Providers\DynamicUrlServiceProvider::class);
