@@ -13,6 +13,7 @@ class HMsoftToolsServiceProvider extends ServiceProvider
         $this->app->register(\HMsoft\Tools\Features\SortNumber\Providers\SortNumberServiceProvider::class);
         $this->app->register(\HMsoft\Tools\Features\BulkDelete\Providers\BulkDeleteServiceProvider::class);
         $this->app->register(\HMsoft\Tools\Features\MassPatch\Providers\MassPatchServiceProvider::class);
+        $this->app->register(\HMsoft\Tools\Features\Validation\Providers\ValidationServiceProvider::class);
         $this->app->register(\HMsoft\Tools\Features\Response\Providers\ResponseServiceProvider::class);
         $this->app->register(\HMsoft\Tools\Features\OptionalAuth\Providers\OptionalAuthServiceProvider::class);
         $this->app->register(\HMsoft\Tools\Features\DynamicUrl\Providers\DynamicUrlServiceProvider::class);
