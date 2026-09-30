@@ -71,6 +71,21 @@ $model->save();
 
 Spatie Data input uses `CmsDateTimeCast` automatically when creating Data from requests.
 
+### Eloquent schedule columns (`CmsScheduleDateTimeCast`)
+
+For model `$casts` on `DATETIME` schedule fields (`from_time` / `to_time`). Not the Spatie Data cast.
+
+```php
+use HMsoft\Tools\Features\DateTime\Casts\CmsScheduleDateTimeCast;
+
+protected $casts = [
+    'from_time' => CmsScheduleDateTimeCast::class,
+    'to_time' => CmsScheduleDateTimeCast::class,
+];
+```
+
+If you use MassPatch, add this FQCN to `mass_patch.datetime_cast_classes` so those fields are discovered as datetime.
+
 ---
 
 ## Custom Timezone — Callback (recommended for simple cases)

@@ -783,6 +783,7 @@ CmsDateTime::resolveApiTimezoneUsing(function (): ?string {
 Features/DateTime/
 ├── config/cms_datetime.php          Default config (publishable)
 ├── Casts/CmsDateTimeCast.php        Spatie input cast
+├── Casts/CmsScheduleDateTimeCast.php Eloquent DATETIME schedule columns
 ├── Contracts/DateTimeResolverInterface.php
 ├── Controllers/DateTimeController.php
 ├── Actions/
