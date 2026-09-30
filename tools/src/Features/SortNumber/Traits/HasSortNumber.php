@@ -3,13 +3,14 @@
 namespace HMsoft\Tools\Features\SortNumber\Traits;
 
 use HMsoft\Tools\Features\SortNumber\Contracts\Sortable;
+use HMsoft\Tools\Features\SortNumber\Support\SortNumberShifter;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 
 trait HasSortNumber
 {
     /**
-     * Boot the sorting trait logic. Hooks natively into Eloquent creating event.
+     * Boot the sorting trait logic. Hooks natively into Eloquent creating and saving events.
      */
     public static function bootHasSortNumber(): void
     {
@@ -21,6 +22,10 @@ trait HasSortNumber
             if (is_null($model->getAttribute($column)) || (int)$model->getAttribute($column) === 0) {
                 $model->setAttribute($column, $model->calculateNextSortNumber($column));
             }
+        });
+
+        static::saving(function (Model $model) {
+            SortNumberShifter::shiftCollisions($model);
         });
     }
 

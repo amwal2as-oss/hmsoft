@@ -1,19 +1,26 @@
 # SortNumber Feature
 
-The Sort Number feature automatically assigns an incremental sorting value to your Eloquent models upon creation. It ensures that new records are placed at the end of the list automatically without requiring manual input.
+The Sort Number feature automatically assigns an incremental sorting value to your Eloquent models upon creation. It also shifts later rows when a save lands on an occupied rank.
 
-## 📂 Directory Structure
+## Directory Structure
 
 ```text
 HMsoft/Tools/Features/SortNumber/
 ├── Contracts/
 │   └── Sortable.php
-└── Traits/
-    └── HasSortNumber.php
+├── Support/
+│   └── SortNumberShifter.php
+├── Traits/
+│   └── HasSortNumber.php
+├── Providers/
+│   └── SortNumberServiceProvider.php
+└── config/
+    └── sort_number.php
 ```
 
-🚀 Installation & Usage
-To implement the Sort Number feature, your model must implement the Sortable contract and use the HasSortNumber trait.
+## Installation & Usage
+
+Your model must implement the Sortable contract and use the HasSortNumber trait.
 
 ```php
 namespace App\Models;
@@ -28,12 +35,11 @@ class Category extends Model implements Sortable
 
     protected $fillable = ['name', 'sort_number'];
 }
-
 ```
 
-When you create a new Category, the sort_number will automatically be calculated as MAX(sort_number) + 1.
+When you create a new Category with an empty sort value, `sort_number` is `MAX(sort_number) + 1`.
 
-Collision insert-and-shift (occupied rank → later rows `+1`) is implemented in the consuming API (`App\Support\SortNumber\SortNumberShifter`, see `docs/sort-number-collision-shift.md`). Scope nested lists with:
+When you save onto a rank that is already used, later rows in the **same sort context** are bumped by `+1` (query builder, no model events). Nested lists stay isolated with:
 
 ```php
 public const SORT_NUMBER_CONTEXT = ['parent_id'];
@@ -41,11 +47,29 @@ public const SORT_NUMBER_CONTEXT = ['parent_id'];
 
 `0` / `null` is not a rank. Empty values still get `MAX + 1` on create.
 
-⚙️ Customization
-Changing the Column Name
-By default, the trait looks for a column named sort_number. If your table uses a different column name (e.g., order_index), you can customize it in one of three ways:
+## Collision shift config
 
-1. Using a Constant (Recommended):
+Package default is on. Publish (optional) and/or set env:
+
+```
+php artisan vendor:publish --tag=hmsoft-sort-number-config
+```
+
+```
+SORT_NUMBER_SHIFT_ON_COLLISION=false
+```
+
+Then `php artisan config:clear` (or `config:cache` in production).
+
+Query-builder / raw SQL / `sync()` updates do not run the shifter. Mass-patch that calls `$row->save()` does.
+
+## Customization
+
+### Changing the column name
+
+By default the trait looks for `sort_number`. If your table uses a different column (e.g. `order_index`), customize it in one of three ways:
+
+1. Using a constant (recommended):
 
 ```php
 class Category extends Model implements Sortable
@@ -56,7 +80,7 @@ class Category extends Model implements Sortable
 }
 ```
 
-2. Using a Class Property:
+2. Using a class property:
 
 ```php
 class Category extends Model implements Sortable
@@ -67,7 +91,7 @@ class Category extends Model implements Sortable
 }
 ```
 
-3. Overriding the Contract Method:
+3. Overriding the contract method:
 
 ```php
 class Category extends Model implements Sortable
@@ -81,10 +105,11 @@ class Category extends Model implements Sortable
 }
 ```
 
-Overriding Context Scoping (scopeSortByContext)
-When working with complex relational layers (such as Polymorphic Models like a unified Faq component), sorting should be calculated within explicit contexts (e.g., specific to an owner_id and owner_type).
+### Overriding context scoping (`scopeSortByContext`)
 
-You can override the scopeSortByContext method to surgically declare your own custom index boundaries:
+When working with complex relational layers (such as polymorphic models), sorting should be calculated within explicit contexts (e.g. `owner_id` and `owner_type`).
+
+You can override `scopeSortByContext` to declare your own index boundaries:
 
 ```php
 <?php
@@ -102,28 +127,25 @@ class Faq extends Model implements Sortable
 
     protected $fillable = ['owner_id', 'owner_type', 'sort_number'];
 
-    /**
-     * 🛠️ SURGICAL OVERRIDE:
-     * Restrict incremental sequential calculations inside the polymorphic boundary.
-     */
     public function scopeSortByContext(Builder $query): Builder
     {
         $ownerType = $this->getAttribute('owner_type');
         $ownerId = $this->getAttribute('owner_id');
 
         if ($ownerType && $ownerId) {
-            // Context Shape 1: Record specific isolation (e.g., Blog #15)
             return $query->where('owner_type', $ownerType)->where('owner_id', $ownerId);
         } elseif ($ownerType && !$ownerId) {
-            // Context Shape 2: Model wide isolation (e.g., All general Blogs)
             return $query->where('owner_type', $ownerType)->whereNull('owner_id');
         }
 
-        // Context Shape 3: Global system FAQs fallback
         return $query->whereNull('owner_type')->whereNull('owner_id');
     }
 }
 ```
 
-💡 How It Works
-The trait hooks into the Eloquent creating event. Before the model is saved to the database, it checks if a value has been provided for the sort column. If the value is null, it executes a query to find the maximum existing value in that column and increments it by 1.
+## How it works
+
+The trait hooks into Eloquent `creating` and `saving`:
+
+1. On create, if the sort column is `null` or `0`, it sets `MAX + 1` in the current sort context.
+2. On save, if that rank is already occupied, `SortNumberShifter` increments every later row in the same context, then the saved row keeps the requested number.
