@@ -8,11 +8,18 @@ class ActiveServiceProvider extends ServiceProvider
 {
     public function register(): void
     {
-        // تسجيل أي Bindings أو Singletons خاصة بميزة الـ Active هنا
+        $this->mergeConfigFrom(
+            __DIR__ . '/../config/active.php',
+            'active'
+        );
     }
 
     public function boot(): void
     {
-        // تحميل أي إعدادات أو مسارات خاصة بهذه الميزة فقط
+        if ($this->app->runningInConsole()) {
+            $this->publishes([
+                __DIR__ . '/../config/active.php' => config_path('active.php'),
+            ], 'hmsoft-active-config');
+        }
     }
 }

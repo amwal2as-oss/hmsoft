@@ -10,7 +10,12 @@ HMsoft/Tools/Features/Active/
 ├── Contracts/
 │   └── Activable.php          # Model contract
 ├── Traits/
-│   └── HasActiveScope.php     # Global scope + local scopes
+│   ├── HasActiveScope.php     # Global scope + local scopes
+│   └── AppliesScheduleActiveCondition.php  # Optional from/to window
+├── Providers/
+│   └── ActiveServiceProvider.php
+├── config/
+│   └── active.php
 └── README.md
 ```
 
@@ -126,6 +131,32 @@ protected function extraActiveCondition(Builder $builder): void
 ```
 
 Keep HMsoft generic — put reusable helpers (e.g. hierarchical categories) in your application layer and call them from `extraActiveCondition()`.
+
+### Schedule window (`AppliesScheduleActiveCondition`)
+
+Optional trait: `is_active` **plus** `from_time` / `to_time` (null = open-ended). Use it instead of `HasActiveScope` alone (it already includes that trait).
+
+```php
+use HMsoft\Tools\Features\Active\Contracts\Activable;
+use HMsoft\Tools\Features\Active\Traits\AppliesScheduleActiveCondition;
+
+class Offer extends Model implements Activable
+{
+    use AppliesScheduleActiveCondition;
+}
+```
+
+Helpers: `isInActiveSchedulePeriod()`, alias `isInActiveInPeriod()`, `scopeActiveInPeriod()`.
+
+Column names (publish `hmsoft-active-config`):
+
+```
+php artisan vendor:publish --tag=hmsoft-active-config
+```
+
+`active.schedule_from_column` / `active.schedule_to_column` (defaults `from_time` / `to_time`).
+
+---
 
 ## Local scopes
 
