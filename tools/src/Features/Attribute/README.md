@@ -72,6 +72,32 @@ Or in PHP:
 $fields = $blog->getEavAttributesWithValues();
 ```
 
+### 6. Scoped attribute controllers (optional)
+
+If URLs are `/api/items/attributes` (no `{scope}` segment), inject scope with middleware and forward to `AttributeController`:
+
+```php
+use HMsoft\Tools\Features\Attribute\Http\ForwardsScopedAttributeActions;
+
+class ItemAttributeController
+{
+    use ForwardsScopedAttributeActions;
+
+    protected function attributeRouteScope(): string
+    {
+        return 'items'; // entity_type becomes Str::singular() → item
+    }
+}
+```
+
+```php
+Route::middleware(['attribute.scope:items'])->group(function () {
+    Route::prefix('items/attributes')->controller(ItemAttributeController::class)->group(/* ... */);
+});
+```
+
+The alias `attribute.scope` is registered by `AttributeServiceProvider`. Shop-specific constants (`users` / `items`) stay in the app.
+
 ---
 
 ## Documentation index

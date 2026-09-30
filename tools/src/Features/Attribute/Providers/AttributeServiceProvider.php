@@ -2,6 +2,7 @@
 
 namespace HMsoft\Tools\Features\Attribute\Providers;
 
+use HMsoft\Tools\Features\Attribute\Http\Middleware\InjectAttributeRouteScope;
 use HMsoft\Tools\Features\Attribute\Services\EavValueSyncService;
 use HMsoft\Tools\Features\Attribute\Support\EavConfig;
 use Illuminate\Support\Facades\Route;
@@ -21,6 +22,11 @@ class AttributeServiceProvider extends ServiceProvider
 
     public function boot(): void
     {
+        $this->app['router']->aliasMiddleware(
+            'attribute.scope',
+            InjectAttributeRouteScope::class
+        );
+
         if (! EavConfig::isEnabled()) {
             return;
         }
